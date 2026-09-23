@@ -2,6 +2,9 @@ const {
     Client, 
     GatewayIntentBits, 
     EmbedBuilder, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle,
     REST,
     Routes,
     SlashCommandBuilder
@@ -36,10 +39,26 @@ server.listen(process.env.PORT || 10000, () => {
     console.log('שרת Keep-Alive פעיל בהצלחה!');
 });
 
-// רשימות הפרסים לתיבות (תוכל לשנות את המילים בתוך הגרשיים לכל פרס שתרצה!)
+// רשימות הפרסים לתיבות
 const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב', 'פרס ניחומים: כלום!', 'גישה לערוץ סודי ל-24 שעות'];
 const woodPrizes = ['תפקיד מיוחד בשרת', 'תקשורת חופשית עם מנהל', 'כרטיס הגרלה חינמי'];
-const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אללוף השרת לתמיד', '🎁 קופון מתנה מיוחד מהנהלת השרת'];
+const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלוף השרת לתמיד', '🎁 קופון מתנה מיוחד מהנהלת השרת'];
+
+// קישורי התמונות שהעלית לתיבות (כולל תיבת העץ שפתחתי עבורך)
+const images = {
+    regular: {
+        closed: 'https://imgur.com', // תיבה ירוקה סגורה
+        opened: 'https://imgur.com'   // תיבה ירוקה פתוחה
+    },
+    wood: {
+        closed: 'https://imgur.com', // תיבת עץ סגורה
+        opened: 'https://imgur.com'   // תיבת עץ פתוחה (ערוכה!)
+    },
+    gold: {
+        closed: 'https://imgur.com', // תיבת זהב סגורה
+        opened: 'https://imgur.com'   // תיבת זהב פתוחה
+    }
+};
 
 // רישום פקודות הסלאש אוטומטית בדיסקורד
 client.once('ready', async () => {
@@ -54,13 +73,13 @@ client.once('ready', async () => {
             .addStringOption(option => option.setName('מילה').setDescription('רשמו את המילה הסודית שצריך לנחש').setRequired(true))
             .addAttachmentOption(option => option.setName('תמונה').setDescription('קובץ תמונה מהמחשב (אופציונלי)').setRequired(false)),
             
-        // 2. פקודת תיבות הפנדורה החדשה!
+        // 2. פקודת תיבות הפנדורה
         new SlashCommandBuilder()
             .setName('פתח-תיבה')
-            .setDescription('פתיחת תיבת פנדורה וקבלת פרס אקראי!')
+            .setDescription('זמינות של תיבת פנדורה לפתיחה בשרת!')
             .addStringOption(option => 
                 option.setName('סוג')
-                    .setDescription('בחרו את סוג התיבה שברצונכם לפתוח')
+                    .setDescription('בחרו את סוג התיבה שברצונכם להציב')
                     .setRequired(true)
                     .addChoices(
                         { name: '🟢 תיבה רגילה', value: 'regular' },
@@ -123,13 +142,81 @@ client.on('messageCreate', async (message) => {
     } catch (error) { console.error(error); }
 });
 
-// הקשבה לפקודות סלאש (איש תלוי ותיבות הפתעה)
+// הקשבה לפקודות סלאש ולחיצות על כפתור פתיחת התיבה
 client.on('interactionCreate', async (interaction) => {
     try {
-        if (!interaction.isChatInputCommand()) return;
+        // 1. הפעלת פקודת הסלאש /פתח-תיבה (מציב תיבה סגורה בשרת)
+        if (interaction.isChatInputCommand() && interaction.commandName === 'פתח-תיבה') {
+            const boxType = interaction.options.getString('סוג');
+            let boxName, embedColor, closedImage;
 
-        // 1. קוד איש תלוי
-        if (interaction.commandName === 'איש-תלוי-הפעלות') {
+            if (boxType === 'regular') {
+                boxName = 'תיבה רגילה ירוקה 🟢';
+                embedColor = '#2ecc71';
+                closedImage = images.regular.closed;
+            } else if (boxType === 'wood') {
+                boxName = 'תיבת עץ 📦';
+                embedColor = '#e67e22';
+                closedImage = images.wood.closed;
+            } else if (boxType === 'gold') {
+                boxName = 'תיבת זהב 🟡';
+                embedColor = '#f1c40f';
+                closedImage = images.gold.closed;
+            }
+
+            const startEmbed = new EmbedBuilder()
+                .setColor(embedColor)
+                .setTitle('🎁 תיבת פנדורה הגיעה לשרת!')
+                .setDescription(`מנהל הציב **${boxName}** מוזהבת ומסתורית בצ'אט!\n\n🔹 **מה צריך לעשות?**\nכל מה שנותר לכם הוא ללחוץ על כפתור ה-**"פתח תיבה"** למטה כדי לפתוח אותה ולגלות במה זכיתם!`)
+                .setImage(closedImage);
+
+            // יצירת כפתור לפתיחת התיבה המיועדת
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`open_box_${boxType}`)
+                    .setLabel('פתח תיבה 🔓')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+            return await interaction.reply({ embeds: [startEmbed], components: [row] });
+        }
+
+        // 2. לחיצה על כפתור פתיחת התיבה (משנה את התמונה לפתוחה ומגריל פרס)
+        if (interaction.isButton() && interaction.customId.startsWith('open_box_')) {
+            const boxType = interaction.customId.replace('open_box_', '');
+            let prizeList, boxName, embedColor, openedImage;
+
+            if (boxType === 'regular') {
+                prizeList = regularPrizes;
+                boxName = 'תיבה רגילה ירוקה 🟢';
+                embedColor = '#2ecc71';
+                openedImage = images.regular.opened;
+            } else if (boxType === 'wood') {
+                prizeList = woodPrizes;
+                boxName = 'תיבת עץ 📦';
+                embedColor = '#e67e22';
+                openedImage = images.wood.opened;
+            } else if (boxType === 'gold') {
+                prizeList = goldPrizes;
+                boxName = 'תיבת זהב 🟡';
+                embedColor = '#f1c40f';
+                openedImage = images.gold.opened;
+            }
+
+            const randomPrize = prizeList[Math.floor(Math.random() * prizeList.length)];
+
+            const finalEmbed = new EmbedBuilder()
+                .setColor(embedColor)
+                .setTitle('🎉 התיבה נפתחה בהצלחה!')
+                .setDescription(`המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**\n\n*בהצלחה, ומי יודע... אולי הפרס הבא שלכם יהיה נדיר במיוחד!*`)
+                .setImage(openedImage); // מציג את התמונה הפתוחה המתאימה!
+
+            // מעדכן את ההודעה המקורית (מעלים את הכפתור ומשנה לתמונה הפתוחה)
+            return await interaction.update({ embeds: [finalEmbed], components: [] });
+        }
+
+        // 3. קוד הפעלת איש תלוי
+        if (interaction.isChatInputCommand() && interaction.commandName === 'איש-תלוי-הפעלות') {
             if (activeGames.has(interaction.channel.id)) {
                 return await interaction.reply({ content: '❌ כבר יש משחק פעיל בערוץ זה!', ephemeral: true });
             }
@@ -140,54 +227,3 @@ client.on('interactionCreate', async (interaction) => {
                 image: interaction.options.getAttachment('תמונה') ? interaction.options.getAttachment('תמונה').url : 'https://imgur.com'
             };
             activeGames.set(interaction.channel.id, gameState);
-            const embed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n**המילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
-            return await interaction.reply({ embeds: [embed] });
-        }
-
-        // 2. קוד פתיחת התיבות החדש!
-        if (interaction.commandName === 'פתח-תיבה') {
-            const boxType = interaction.options.getString('סוג');
-            let prizeList, boxName, embedColor, boxImage;
-
-            // קביעת הגדרות לפי סוג התיבה שנבחרה
-            if (boxType === 'regular') {
-                prizeList = regularPrizes;
-                boxName = 'תיבה רגילה 🟢';
-                embedColor = '#2ecc71'; // ירוק
-                boxImage = 'https://imgur.com'; // תוכל לשנות לקישור תמונה משלך
-            } else if (boxType === 'wood') {
-                prizeList = woodPrizes;
-                boxName = 'תיבת עץ 📦';
-                embedColor = '#e67e22'; // כתום/חום
-                boxImage = 'https://imgur.com';
-            } else if (boxType === 'gold') {
-                prizeList = goldPrizes;
-                boxName = 'תיבת זהב 🟡';
-                embedColor = '#f1c40f'; // צהוב זהב
-                boxImage = 'https://imgur.com';
-            }
-
-            // הגרלת פרס אקראי מתוך הרשימה המתאימה
-            const randomPrize = prizeList[Math.floor(Math.random() * prizeList.length)];
-
-            // יצירת הודעת הזכייה המעוצבת (Embed)
-            const boxEmbed = new EmbedBuilder()
-                .setColor(embedColor)
-                .setTitle('🎁 פתיחת תיבת פנדורה!')
-                .setDescription(`המפתח הסתובב... ונפתחה **${boxName}** על ידי ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**\n\n*בהצלחה, ומי יודע... אולי הפרס הבא שלכם יהיה נדיר במיוחד!*`)
-                .setThumbnail(boxImage);
-
-            return await interaction.reply({ embeds: [boxEmbed] });
-        }
-    } catch (error) { console.error(error); }
-});
-
-function displayWordStatus(gameState) {
-    let display = '';
-    for (const letter of gameState.word) {
-        display += gameState.guessedLetters.has(letter) ? ` ${letter} ` : ' ＿ ';
-    }
-    return '`' + display.trim() + '`';
-}
-
-client.login(process.env.DISCORD_TOKEN);
