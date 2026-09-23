@@ -44,7 +44,7 @@ server.listen(PORT, () => {
     console.log(`שרת המניעה מאופליין פועל על פורט ${PORT}`);
 });
 
-// רישום פקודת הסלאש עם 3 תבניות
+// רישום פקודת הסלאש עם אפשרות להעלאת קובץ תמונה ישירות מהמחשב
 client.once('ready', async () => {
     console.log('טרופידון מחובר ומוכן לעבודה!');
     
@@ -64,10 +64,10 @@ client.once('ready', async () => {
                     .setDescription('רשמו את המילה הסודית שצריך לנחש')
                     .setRequired(true)
             )
-            // תבנית 3: קישור לתמונה
-            .addStringOption(option => 
+            // תבנית 3 משודרגת: העלאת קובץ תמונה ישירות מהמחשב!
+            .addAttachmentOption(option => 
                 option.setName('תמונה')
-                    .setDescription('הדביקו קישור לתמונה שתרצו להציג (אופציונלי)')
+                    .setDescription('לחצו כאן או גררו קובץ תמונה ישירות מהמחשב שלכם (אופציונלי)')
                     .setRequired(false)
             )
     ].map(command => command.toJSON());
@@ -75,7 +75,7 @@ client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
     try {
-        console.log('מתחיל לרשום פקודות סלאש אוטומטית עם תבניות החדשות...');
+        console.log('מתחיל לרשום פקודות סלאש אוטומטית עם אפשרות העלאת קבצים...');
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
             await rest.put(
@@ -114,14 +114,12 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.reply({ content: '❌ כבר יש משחק איש תלוי פעיל בערוץ הזה!', ephemeral: true });
             }
 
-            // קריאת הערכים שהמנהל הקליד
             const subject = interaction.options.getString('נושא');
             const customWord = interaction.options.getString('מילה').trim();
-            let imageUrl = interaction.options.getString('תמונה');
             
-            if (!imageUrl || !imageUrl.startsWith('http')) {
-                imageUrl = 'https://imgur.com';
-            }
+            // קריאת קובץ התמונה שהועלה מהמחשב
+            const imageAttachment = interaction.options.getAttachment('תמונה');
+            let imageUrl = imageAttachment ? imageAttachment.url : 'https://imgur.com';
 
             const gameState = {
                 word: customWord,
