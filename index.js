@@ -25,9 +25,6 @@ const client = new Client({
 // מאגר המשחקים הפעילים
 const activeGames = new Map();
 
-// רשימת מילים למשחק
-const wordsList = ['דיסקורד', 'טרופידון', 'מחשב', 'תכנות', 'שרת', 'בוט', 'משחק'];
-
 // הגנה מושלמת מפני קריסות
 process.on('unhandledRejection', (reason, promise) => {
     console.error('נלכדה שגיאה לא מטופלת:', reason);
@@ -47,7 +44,7 @@ server.listen(PORT, () => {
     console.log(`שרת המניעה מאופליין פועל על פורט ${PORT}`);
 });
 
-// רישום פקודת הסלאש אוטומטית עם תבניות (Options)
+// רישום פקודת הסלאש עם 3 תבניות
 client.once('ready', async () => {
     console.log('טרופידון מחובר ומוכן לעבודה!');
     
@@ -61,7 +58,13 @@ client.once('ready', async () => {
                     .setDescription('רשמו את נושא המשחק (לדוגמה: כללי, הפעלות, חיות)')
                     .setRequired(true)
             )
-            // תבנית 2: קישור לתמונה
+            // תבנית 2: המילה הסודית למשחק
+            .addStringOption(option => 
+                option.setName('מילה')
+                    .setDescription('רשמו את המילה הסודית שצריך לנחש')
+                    .setRequired(true)
+            )
+            // תבנית 3: קישור לתמונה
             .addStringOption(option => 
                 option.setName('תמונה')
                     .setDescription('הדביקו קישור לתמונה שתרצו להציג (אופציונלי)')
@@ -72,7 +75,7 @@ client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
     try {
-        console.log('מתחיל לרשום פקודות סלאש אוטומטית עם תבניות...');
+        console.log('מתחיל לרשום פקודות סלאש אוטומטית עם תבניות החדשות...');
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
             await rest.put(
@@ -111,18 +114,17 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.reply({ content: '❌ כבר יש משחק איש תלוי פעיל בערוץ הזה!', ephemeral: true });
             }
 
-            // קריאת הערכים שהמשתמש הקליד בתבניות
+            // קריאת הערכים שהמנהל הקליד
             const subject = interaction.options.getString('נושא');
+            const customWord = interaction.options.getString('מילה').trim();
             let imageUrl = interaction.options.getString('תמונה');
             
-            // אם המשתמש לא שם תמונה, נשתמש בתמונת ברירת המחדל
             if (!imageUrl || !imageUrl.startsWith('http')) {
                 imageUrl = 'https://imgur.com';
             }
 
-            const secretWord = wordsList[Math.floor(Math.random() * wordsList.length)];
             const gameState = {
-                word: secretWord,
+                word: customWord,
                 guessedLetters: new Set(),
                 subject: subject,
                 image: imageUrl
