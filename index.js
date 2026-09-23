@@ -20,13 +20,14 @@ const client = new Client({
 // מאגר המשחקים הפעילים של איש תלוי
 const activeGames = new Map();
 
+// =======================================================
+// 👑 נעילת הבוט: שים כאן את ה-ID האישי שלך מדיסקורד! 👑
+// =======================================================
+const OWNER_ID = 'שים_כאן_את_האיידי_האישי_שלך';
+
 // הגנה מוחלטת מפני קריסות
-process.on('unhandledRejection', (reason) => { 
-    console.error('נלכדה שגיאה (דלג):', reason); 
-});
-process.on('uncaughtException', (err) => { 
-    console.error('נלכדה שגיאה חמורה (דלג):', err); 
-});
+process.on('unhandledRejection', (reason) => { console.error('שגיאה:', reason); });
+process.on('uncaughtException', (err) => { console.error('שגיאה חמורה:', err); });
 
 // שרת אינטרנט פנימי לשמירה על הבוט ער 24/7 ב-Render
 const server = http.createServer((req, res) => {
@@ -35,30 +36,12 @@ const server = http.createServer((req, res) => {
 });
 server.listen(process.env.PORT || 10000);
 
-// ==========================================
-// 🎁 כאן אתה יכול לשנות את הפרסים בקלות! 🎁
-// פשוט שנה את המילים בתוך הגרשיים למה שתרצה
-// ==========================================
-const regularPrizes = [
-    'נקודות לשרת', 
-    'תפקיד זמני מעוצב', 
-    'פרס ניחומים: כלום!', 
-    'גישה לערוץ סודי ל-24 שעות'
-];
+// רשימות הפרסים לתיבות
+const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב', 'פרס ניחומים: כלום!', 'גישה לערוץ סודי ל-24 שעות'];
+const woodPrizes = ['תפקיד מיוחד בשרת', 'תקשורת חופשית עם מנהל', 'כרטיס הגרלה חינמי'];
+const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלוף השרת לתמיד', '🎁 קופון מתנה מיוחד מהנהלת השרת'];
 
-const woodPrizes = [
-    'תפקיד מיוחד בשרת', 
-    'תקשורת חופשית עם מנהל', 
-    'כרטיס הגרלה חינמי'
-];
-
-const goldPrizes = [
-    'רול ייחודי רק בשבילכם!', 
-    'פריט נדיר בטרופי!', 
-    '🎁 מזל כפול בהגרלות לזמן מוגבל'
-];
-
-// קישורי התמונות הרשמיים כברירת מחדל (ניתן לשינוי דרך הפקודה החדשה!)
+// קישורי התמונות של התיבות
 const images = {
     regular: {
         closed: 'https://discordapp.com',
@@ -74,25 +57,21 @@ const images = {
     }
 };
 
-// רישום פקודות סלאש ישירות לתוך השרתים
+// רישום פקודות סלאש אוטומטית בדיסקורד
 client.once('ready', async () => {
     console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
     
     const commandsData = [
-        // 1. פקודת SAY
         new SlashCommandBuilder()
             .setName('say')
             .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
             .addStringOption(option => option.setName('תוכן').setDescription('רשמו את מה שאתם רוצים שהבוט יגיד').setRequired(true)),
             
-        // 2. פקודת פתח תיבה
         new SlashCommandBuilder()
             .setName('פתח-תיבה')
             .setDescription('זמינות של תיבת פנדורה לפתיחה בשרת!')
             .addStringOption(option => 
-                option.setName('סוג')
-                    .setDescription('בחרו את סוג התיבה')
-                    .setRequired(true)
+                option.setName('סוג').setDescription('בחרו את סוג התיבה').setRequired(true)
                     .addChoices(
                         { name: '🟢 תיבה רגילה', value: 'regular' },
                         { name: '📦 תיבת עץ', value: 'wood' },
@@ -100,106 +79,71 @@ client.once('ready', async () => {
                     )
             ),
 
-        // 3. פקודת שינוי תמונות החדשה! 🖼️
         new SlashCommandBuilder()
             .setName('תמונות-תיבה')
             .setDescription('שינוי תמונות התיבות בבוט בלייב!')
-            .addStringOption(option => 
-                option.setName('תיבה')
-                    .setDescription('בחרו איזה סוג תיבה לשנות')
-                    .setRequired(true)
-                    .addChoices(
-                        { name: '🟢 תיבה רגילה ירוקה', value: 'regular' },
-                        { name: '📦 תיבת עץ', value: 'wood' },
-                        { name: '🟡 תיבת זהב', value: 'gold' }
-                    )
+            .addStringOption(option => option.setName('תיבה').setDescription('בחרו איזה סוג תיבה לשנות').setRequired(true)
+                .addChoices(
+                    { name: '🟢 תיבה רגילה ירוקה', value: 'regular' },
+                    { name: '📦 תיבת עץ', value: 'wood' },
+                    { name: '🟡 תיבת זהב', value: 'gold' }
+                )
             )
-            .addStringOption(option => 
-                option.setName('מצב')
-                    .setDescription('בחרו האם לשנות את המצב הסגור או הפתוח')
-                    .setRequired(true)
-                    .addChoices(
-                        { name: '🔒 תיבה סגורה (לפני פתיחה)', value: 'closed' },
-                        { name: '🔓 תיבה פתוחה (אחרי פתיחה)', value: 'opened' }
-                    )
+            .addStringOption(option => option.setName('מצב').setDescription('בחרו האם לשנות את המצב הסגור או הפתוח').setRequired(true)
+                .addChoices(
+                    { name: '🔒 תיבה סגורה (לפני פתיחה)', value: 'closed' },
+                    { name: '🔓 תיבה פתוחה (אחרי פתיחה)', value: 'opened' }
+                )
             )
-            .addAttachmentOption(option => 
-                option.setName('קובץ-תמונה')
-                    .setDescription('העלו את קובץ התמונה החדש מהמחשב')
-                    .setRequired(true)
-            )
+            .addAttachmentOption(option => option.setName('קובץ-תמונה').setDescription('העלו את קובץ התמונה החדש מהמחשב').setRequired(true)),
+
+        new SlashCommandBuilder()
+            .setName('איש-תלוי-הפעלות')
+            .setDescription('הפעלת משחק איש תלוי מעוצב בשרת')
+            .addStringOption(option => option.setName('נושא').setDescription('רשמו את נושא המשחק').setRequired(true))
+            .addStringOption(option => option.setName('מילה').setDescription('רשמו את המילה הסודית שצריך לנחש').setRequired(true))
+            .addAttachmentOption(option => option.setName('תמונה').setDescription('קובץ תמונה מהמחשב (אופציונלי)').setRequired(false))
     ];
 
     try {
-        console.log('מתחיל רישום ישיר ומיידי לשרתים שלך...');
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
             await client.application.commands.set(commandsData, guildId);
         }
-        console.log('כל פקודות הסלאש כולל שינוי התמונות עודכנו בהצלחה!');
+        console.log('כל פקודות הסלאש עודכנו בשרת שלך בהצלחה!');
     } catch (error) { console.error('שגיאה ברישום:', error); }
 });
 
-// הקשבה להודעות רגילות
+// הקשבה להודעות בצ'אט (תגובות רגילות וניחושי איש תלוי)
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
     if (message.content === 'היי') return await message.reply('היי');
     if (message.content === 'מה נשמע טרופידון?') return await message.reply('בסדר... מה איתך?');
+
+    // מנגנון ניחוש איש תלוי בצ'אט (כאן כולם יכולים להשתתף ולנחש אותיות!)
+    if (activeGames.has(message.channel.id)) {
+        const gameState = activeGames.get(message.channel.id);
+        const guess = message.content.trim();
+        if (guess.length !== 1) return;
+        if (gameState.guessedLetters.has(guess)) return await message.reply(`האות **${guess}** כבר נוחשה!`);
+
+        gameState.guessedLetters.add(guess);
+        let statusText = '';
+        if (gameState.word.includes(guess)) {
+            const isWon = [...gameState.word].every(letter => gameState.guessedLetters.has(letter));
+            if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`המילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
+            statusText = `✅ האות **${guess}** נכונה!`;
+        } else { statusText = `❌ האות **${guess}** אינה נכונה!`; }
+
+        const updatedEmbed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n${statusText}\n\n**המילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
+        return await message.reply({ embeds: [updatedEmbed] });
+    }
 });
 
 // הקשבה לפקודות סלאש ואינטראקציות
 client.on('interactionCreate', async (interaction) => {
     try {
-        if (!interaction.isChatInputCommand() && !interaction.isButton()) return;
-
-        // 1. פקודת SAY
-        if (interaction.isChatInputCommand() && interaction.commandName === 'say') {
-            const messageContent = interaction.options.getString('תוכן');
-            await interaction.reply({ content: '✅ ההודעה נשלחה בהצלחה!', ephemeral: true });
-            return await interaction.channel.send({ content: messageContent });
-        }
-
-        // 2. פקודת שינוי תמונות התיבה 🖼️
-        if (interaction.isChatInputCommand() && interaction.commandName === 'תמונות-תיבה') {
-            const targetBox = interaction.options.getString('תיבה');
-            const targetStatus = interaction.options.getString('מצב');
-            const newImageAttachment = interaction.options.getAttachment('קובץ-תמונה');
-
-            // עדכון הקישור בזיכרון של הבוט בלייב!
-            images[targetBox][targetStatus] = newImageAttachment.url;
-
-            const previewEmbed = new EmbedBuilder()
-                .setColor('#9b59b6')
-                .setTitle('🖼️ התמונה עודכנה בהצלחה!')
-                .setDescription(`התמונה של **${targetBox === 'regular' ? 'תיבה רגילה' : targetBox === 'wood' ? 'תיבת עץ' : 'תיבת זהב'}** במצב **${targetStatus === 'closed' ? 'סגור 🔒' : 'פתוח 🔓'}** שונתה לתמונה שהעליתם.\n\nמכאן והלאה, בפתיחת התיבות הבאה, הבוט ישתמש בתמונה זו!`)
-                .setImage(newImageAttachment.url);
-
-            return await interaction.reply({ embeds: [previewEmbed], ephemeral: true });
-        }
-
-        // 3. פקודת פתח-תיבה
-        if (interaction.isChatInputCommand() && interaction.commandName === 'פתח-תיבה') {
-            const boxType = interaction.options.getString('סוג');
-            let boxName, embedColor, closedImage;
-
-            if (boxType === 'regular') { boxName = 'תיבה רגילה ירוקה 🟢'; embedColor = '#2ecc71'; closedImage = images.regular.closed; }
-            else if (boxType === 'wood') { boxName = 'תיבת עץ 📦'; embedColor = '#e67e22'; closedImage = images.wood.closed; }
-            else if (boxType === 'gold') { boxName = 'תיבת זהב 🟡'; embedColor = '#f1c40f'; closedImage = images.gold.closed; }
-
-            const startEmbed = new EmbedBuilder()
-                .setColor(embedColor)
-                .setTitle('🎁 תיבת פנדורה הגיעה לשרת!')
-                .setDescription(`מנהל הציב **${boxName}** מוזהבת ומסתורית בצ'אט!\n\nלחצו על הכפתור למטה כדי לפתוח!`)
-                .setImage(closedImage);
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`open_box_${boxType}`).setLabel('פתח תיבה 🔓').setStyle(ButtonStyle.Success)
-            );
-
-            return await interaction.reply({ embeds: [startEmbed], components: [row] });
-        }
-
-        // 4. לחיצה על כפתור פתיחת התיבה
+        // אם מדובר בלחיצה על כפתור פתיחת התיבה - כאן כולם יכולים ללחוץ ולפתוח את התיבה שהצבת!
         if (interaction.isButton() && interaction.customId.startsWith('open_box_')) {
             const boxType = interaction.customId.replace('open_box_', '');
             let prizeList, boxName, embedColor, openedImage;
@@ -209,16 +153,36 @@ client.on('interactionCreate', async (interaction) => {
             else if (boxType === 'gold') { prizeList = goldPrizes; boxName = 'תיבת זהב 🟡'; embedColor = '#f1c40f'; openedImage = images.gold.opened; }
 
             const randomPrize = prizeList[Math.floor(Math.random() * prizeList.length)];
-
-            const finalEmbed = new EmbedBuilder()
-                .setColor(embedColor)
-                .setTitle('🎉 התיבה נפתחה בהצלחה!')
-                .setDescription(`👑 המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**`)
-                .setImage(openedImage);
-
+            const finalEmbed = new EmbedBuilder().setColor(embedColor).setTitle('🎉 התיבה נפתחה בהצלחה!').setDescription(`👑 המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**`).setImage(openedImage);
             return await interaction.update({ embeds: [finalEmbed], components: [] });
         }
-    } catch (error) { console.error(error); }
-});
 
-client.login(process.env.DISCORD_TOKEN);
+        // 🔒 בדיקת אבטחה לפקודות סלאש: רק אתה יכול להקליד ולהפעיל את הפקודות!
+        if (interaction.isChatInputCommand()) {
+            if (interaction.user.id !== OWNER_ID) {
+                return await interaction.reply({ content: '❌ השגיאה: אין לך הרשאות להשתמש בבוט זה. הפקודות חסומות ומיועדות לבעלי הבוט בלייב בלבד!', ephemeral: true });
+            }
+
+            // 1. פקודת SAY
+            if (interaction.commandName === 'say') {
+                const messageContent = interaction.options.getString('תוכן');
+                await interaction.reply({ content: '✅ ההודעה נשלחה בהצלחה!', ephemeral: true });
+                return await interaction.channel.send({ content: messageContent });
+            }
+
+            // 2. פקודת תמונות-תיבה
+            if (interaction.commandName === 'תמונות-תיבה') {
+                const targetBox = interaction.options.getString('תיבה');
+                const targetStatus = interaction.options.getString('מצב');
+                const newImageAttachment = interaction.options.getAttachment('קובץ-תמונה');
+                images[targetBox][targetStatus] = newImageAttachment.url;
+                const previewEmbed = new EmbedBuilder().setColor('#9b59b6').setTitle('🖼️ התמונה עודכנה!').setDescription(`התמונה עודכנה בהצלחה.`).setImage(newImageAttachment.url);
+                return await interaction.reply({ embeds: [previewEmbed], ephemeral: true });
+            }
+
+            // 3. פקודת פתח-תיבה
+            if (interaction.commandName === 'פתח-תיבה') {
+                const boxType = interaction.options.getString('סוג');
+                let boxName, embedColor, closedImage;
+                if (boxType === 'regular') { boxName = 'תיבה רגילה ירוקה 🟢'; embedColor = '#2ecc71'; closedImage = images.regular.closed; }
+                else if (boxType === 'wood') { boxName = 'תיבת עץ 📦'; embedColor = '#e67e22'; closedImage = images.wood.closed; }
