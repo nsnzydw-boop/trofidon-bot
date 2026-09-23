@@ -88,7 +88,7 @@ client.once('ready', async () => {
                     )
             ),
             
-        // 3. פקודת SAY החדשה!
+        // 3. פקודת SAY
         new SlashCommandBuilder()
             .setName('say')
             .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
@@ -155,21 +155,17 @@ client.on('messageCreate', async (message) => {
 // הקשבה לפקודות סלאש ואינטראקציות
 client.on('interactionCreate', async (interaction) => {
     try {
-        if (!interaction.isChatInputCommand()) return;
+        if (!interaction.isChatInputCommand() && !interaction.isButton()) return;
 
-        // 1. הפעלת פקודת הסלאש /say החדשה
-        if (interaction.commandName === 'say') {
+        // 1. פקודת SAY
+        if (interaction.isChatInputCommand() && interaction.commandName === 'say') {
             const messageContent = interaction.options.getString('תוכן');
-            
-            // שולח הודעה סודית למפעיל שהכל בוצע (אחרים לא יראו את זה)
             await interaction.reply({ content: 'ההודעה נשלחה בהצלחה!', ephemeral: true });
-            
-            // שולח את ההודעה הגלויה לכולם בשם הבוט
             return await interaction.channel.send({ content: messageContent });
         }
 
-        // 2. הפעלת פקודת הסלאש /פתיחת-תיבה
-        if (interaction.commandName === 'פתיחת-תיבה') {
+        // 2. פקודת פתיחת-תיבה
+        if (interaction.isChatInputCommand() && interaction.commandName === 'פתיחת-תיבה') {
             const boxType = interaction.options.getString('סוג');
             let boxName, embedColor, closedImage;
 
@@ -230,9 +226,10 @@ client.on('interactionCreate', async (interaction) => {
             const finalEmbed = new EmbedBuilder()
                 .setColor(embedColor)
                 .setTitle('🎉 התיבה נפתחה בהצלחה!')
-                .setDescription(`המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**\n\n*בהצלחה, ומי יודע... אולי הפרס הבא שלכם יהיה נדיר במיוחד!*`)
+                .setDescription(`Mפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**\n\n*בהצלחה, ומי יודע... אולי הפרס הבא שלכם יהיה נדיר במיוחד!*`)
                 .setImage(openedImage);
 
             return await interaction.update({ embeds: [finalEmbed], components: [] });
         }
 
+        // 4. פקודת איש תלוי
