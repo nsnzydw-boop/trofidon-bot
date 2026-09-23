@@ -24,7 +24,7 @@ const activeGames = new Map();
 // רשימת מילים למשחק
 const wordsList = ['דיסקורד', 'טרופידון', 'מחשב', 'תכנות', 'שרת', 'בוט', 'משחק'];
 
-// הגנה מושלמת מפני קריסות
+// הגנה מושלמת מפני קריסות - מונע מהבוט לרדת מאופליין לעולם!
 process.on('unhandledRejection', (reason, promise) => {
     console.error('נלכדה שגיאה לא מטופלת:', reason);
 });
@@ -33,15 +33,15 @@ process.on('uncaughtException', (err, origin) => {
 });
 
 client.once('ready', () => {
-    console.log(`הבוט \${client.user.tag} מחובר ומוכן לעבודה!`);
+    console.log('טרופידון מחובר ומוכן לעבודה!');
 });
 
-// הקשבה להודעות (עבור הפקודה והתשובות הרגילות)
+// הקשבה להודעות בצ'אט
 client.on('messageCreate', async (message) => {
     try {
         if (message.author.bot) return;
 
-        // התשובות הרגילות שלך
+        // התשובות הרגילות
         if (message.content === 'היי') {
             return await message.reply('היי');
         }
@@ -60,29 +60,27 @@ client.on('messageCreate', async (message) => {
                 word: secretWord,
                 guessedLetters: new Set(),
                 maxAttempts: 6,
-                wrongAttempts: 0,
-                messageId: null
+                wrongAttempts: 0
             };
 
             activeGames.set(message.channel.id, gameState);
 
-            // יצירת ה-Embed המעוצב (כמו בתמונה)
+            // יצירת ה-Embed המעוצב
             const embed = new EmbedBuilder()
-                .setColor('#0099ff') // פס כחול בצד
+                .setColor('#0099ff')
                 .setTitle('🎯 איש תלוי')
-                .setDescription(`• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n**המילה המסתורית:**\n\${displayWordStatus(gameState)}\n\n❤️ ניסיונות שנשארו: \`${gameState.maxAttempts - gameState.wrongAttempts}\``)
-                .setImage('https://imgur.com'); // תמונת רקע קבועה לאיש תלוי
+                .setDescription('• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState) + '\n\n❤️ ניסיונות שנשארו: ' + (gameState.maxAttempts - gameState.wrongAttempts))
+                .setImage('https://imgur.com');
 
-            // יצירת כפתור לניחוש
+            // יצירת כפתור לניחוש אות
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId('guess_letter_btn')
                     .setLabel('ניחוש אות')
-                    .setStyle(ButtonStyle.Primary) // כפתור כחול
+                    .setStyle(ButtonStyle.Primary)
             );
 
-            const gameMessage = await message.channel.send({ embeds: [embed], components: [row] });
-            gameState.messageId = gameMessage.id;
+            await message.channel.send({ embeds: [embed], components: [row] });
             return;
         }
     } catch (error) {
@@ -90,7 +88,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// הקשבה ללחיצות על כפתורים וחלונות (Interactions)
+// הקשבה ללחיצות על כפתורים וחלונות קופצים
 client.on('interactionCreate', async (interaction) => {
     try {
         // 1. לחיצה על כפתור "ניחוש אות" -> פתיחת חלון קופץ (Modal)
@@ -118,7 +116,7 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.showModal(modal);
         }
 
-        // 2. קבלת האות שהמשתמש הקליד בחלון הקופץ
+        // 2. קבלת האות שהמשתמש הקליד
         if (interaction.isModalSubmit() && interaction.customId === 'guess_letter_modal') {
             const gameState = activeGames.get(interaction.channel.id);
             if (!gameState) {
@@ -128,13 +126,12 @@ client.on('interactionCreate', async (interaction) => {
             const guess = interaction.fields.getTextInputValue('letter_input_field').trim();
             
             if (gameState.guessedLetters.has(guess)) {
-                return await interaction.reply({ content: `האות **\${guess}** כבר נוחשה בעבר!`, ephemeral: true });
+                return await interaction.reply({ content: 'האות **' + guess + '** כבר נוחשה בעבר!', ephemeral: true });
             }
 
             gameState.guessedLetters.add(guess);
             let statusText = '';
 
-            // בדיקה אם האות נכונה או שגויה
             if (gameState.word.includes(guess)) {
                 const isWon = [...gameState.word].every(letter => gameState.guessedLetters.has(letter));
                 
@@ -142,13 +139,13 @@ client.on('interactionCreate', async (interaction) => {
                     activeGames.delete(interaction.channel.id);
                     
                     const winEmbed = new EmbedBuilder()
-                        .setColor('#1f8b4c') // ירוק
+                        .setColor('#1f8b4c')
                         .setTitle('🎉 ניצחון במשחק!')
-                        .setDescription(`כל הכבוד! המילה המלאה פוענחה בהצלחה.\n\n👑 המילה הייתה: **\${gameState.word}**`);
+                        .setDescription('כל הכבוד! המילה המלאה פוענחה בהצלחה.\n\n👑 המילה הייתה: **' + gameState.word + '**');
                     
                     return await interaction.update({ embeds: [winEmbed], components: [] });
                 }
-                statusText = `✅ האות **\${guess}** נכונה!`;
+                statusText = '✅ האות **' + guess + '** נכונה!';
             } else {
                 gameState.wrongAttempts++;
                 
@@ -156,26 +153,26 @@ client.on('interactionCreate', async (interaction) => {
                     activeGames.delete(interaction.channel.id);
                     
                     const loseEmbed = new EmbedBuilder()
-                        .setColor('#992d22') // אדום
+                        .setColor('#992d22')
                         .setTitle('💀 המשחק נגמר - הפסדתם!')
-                        .setDescription(`אזלו הניסיונות שלכם.\n\n💡 המילה המסתורית הייתה: **\${gameState.word}**`);
+                        .setDescription('אזלו הניסיונות שלכם.\n\n💡 המילה המסתורית הייתה: **' + gameState.word + '**');
                         
                     return await interaction.update({ embeds: [loseEmbed], components: [] });
                 }
-                statusText = `❌ האות **\${guess}** אינה נכונה!`;
+                statusText = '❌ האות **' + guess + '** אינה נכונה!';
             }
 
-            // עדכון ה-Embed המרכזי עם המצב החדש של המילה והניסיונות
+            // עדכון ה-Embed
             const updatedEmbed = new EmbedBuilder()
                 .setColor('#0099ff')
                 .setTitle('🎯 איש תלוי')
-                .setDescription(`• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n\({statusText}\n\n**המילה המסתורית:**\n\){displayWordStatus(gameState)}\n\n❤️ ניסיונות שנשארו: \`${gameState.maxAttempts - gameState.wrongAttempts}\``)
+                .setDescription('• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n' + statusText + '\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState) + '\n\n❤️ ניסיונות שנשארו: ' + (gameState.maxAttempts - gameState.wrongAttempts))
                 .setImage('https://imgur.com');
 
             return await interaction.update({ embeds: [updatedEmbed] });
         }
     } catch (error) {
-        console.error('שגיאה בעיבוד כפתור או חלון קופץ:', error);
+        console.error('שגיאה בעיבוד כפתור:', error);
     }
 });
 
