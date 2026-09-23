@@ -22,7 +22,7 @@ const client = new Client({
 // מאגר המשחקים הפעילים של איש תלוי
 const activeGames = new Map();
 
-// הגנה מוחלטת מפני קריסות
+// הגנה מוחלטת מפני קריסות - מונע מהבוט להיכבות בשגיאות
 process.on('unhandledRejection', (reason) => { 
     console.error('נלכדה שגיאה (דלג):', reason); 
 });
@@ -44,19 +44,19 @@ const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב'
 const woodPrizes = ['תפקיד מיוחד בשרת', 'תקשורת חופשית עם מנהל', 'כרטיס הגרלה חינמי'];
 const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלוף השרת לתמיד', '🎁 קופון מתנה מיוחד מהנהלת השרת'];
 
-// קישורי התמונות שהעלית לתיבות
+// קישורי התמונות הרשמיים של התיבות
 const images = {
     regular: {
-        closed: 'https://imgur.com', // תיבה ירוקה סגורה
-        opened: 'https://imgur.com'   // תיבה ירוקה פתוחה
+        closed: 'https://discordapp.com',
+        opened: 'https://discordapp.com'
     },
     wood: {
-        closed: 'https://imgur.com', // תיבת עץ סגורה
-        opened: 'https://imgur.com'   // תיבת עץ פתוחה
+        closed: 'https://discordapp.com',
+        opened: 'https://discordapp.com'
     },
     gold: {
-        closed: 'https://imgur.com', // תיבת זהב סגורה
-        opened: 'https://imgur.com'   // תיבת זהב פתוחה
+        closed: 'https://discordapp.com',
+        opened: 'https://discordapp.com'
     }
 };
 
@@ -73,7 +73,7 @@ client.once('ready', async () => {
             .addStringOption(option => option.setName('מילה').setDescription('רשמו את המילה הסודית שצריך לנחש').setRequired(true))
             .addAttachmentOption(option => option.setName('תמונה').setDescription('קובץ תמונה מהמחשב (אופציונלי)').setRequired(false)),
             
-        // 2. פקודת תיבות הפנדורה החדשה והנקייה!
+        // 2. פקודת תיבות הפנדורה
         new SlashCommandBuilder()
             .setName('פתיחת-תיבה')
             .setDescription('זמינות של תיבת פנדורה לפתיחה בשרת!')
@@ -92,7 +92,7 @@ client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
     try {
-        console.log('מתחיל לרשום פקודות סלאש חדשות...');
+        console.log('מתחיל לרשום פקודות סלאש...');
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
             await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: commands });
@@ -225,10 +225,3 @@ client.on('interactionCreate', async (interaction) => {
                 image: interaction.options.getAttachment('תמונה') ? interaction.options.getAttachment('תמונה').url : 'https://imgur.com'
             };
             activeGames.set(interaction.channel.id, gameState);
-            const embed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n**המילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
-            return await interaction.reply({ embeds: [embed] });
-        }
-    } catch (error) { console.error(error); }
-});
-
-function displayWordStatus(gameState) {
