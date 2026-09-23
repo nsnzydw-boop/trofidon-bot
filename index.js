@@ -35,7 +35,7 @@ process.on('uncaughtException', (err, origin) => {
     console.error('נלכדה שגיאה חמורה:', err);
 });
 
-// רישום פקודת הסלאש בדיסקורד
+// רישום פקודת הסלאש אוטומטית בכל השרתים שהבוט נמצא בהם
 client.once('ready', async () => {
     console.log('טרופידון מחובר ומוכן לעבודה!');
     
@@ -48,12 +48,18 @@ client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
     try {
-        console.log('מתחיל לרשום פקודות סלאש...');
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: commands },
-        );
-        console.log('פקודות הסלאש נרשמו בהצלחה!');
+        console.log('מתחיל לרשום פקודות סלאש אוטומטית...');
+        
+        // הבוט לוקח לבד את הרשימה של השרתים שלו ורושם בהם את הפקודה מיד
+        const guilds = await client.guilds.fetch();
+        for (const [guildId] of guilds) {
+            await rest.put(
+                Routes.applicationGuildCommands(client.user.id, guildId),
+                { body: commands },
+            );
+        }
+        
+        console.log('פקודות הסלאש נרשמו בשרתים בהצלחה ויכולות לעבוד עכשיו!');
     } catch (error) {
         console.error('שגיאה ברישום פקודות סלאש:', error);
     }
