@@ -12,6 +12,7 @@ const {
     Routes,
     SlashCommandBuilder
 } = require('discord.js');
+const http = require('http');
 
 const client = new Client({
     intents: [
@@ -27,7 +28,7 @@ const activeGames = new Map();
 // רשימת מילים למשחק
 const wordsList = ['דיסקורד', 'טרופידון', 'מחשב', 'תכנות', 'שרת', 'בוט', 'משחק'];
 
-// הגנה מושלמת מפני קריסות
+// הגנה מושלמת מפני קריסות - מונע מהבוט להיכבות בשגיאות
 process.on('unhandledRejection', (reason, promise) => {
     console.error('נלכדה שגיאה לא מטופלת:', reason);
 });
@@ -35,7 +36,19 @@ process.on('uncaughtException', (err, origin) => {
     console.error('נלכדה שגיאה חמורה:', err);
 });
 
-// רישום פקודת הסלאש אוטומטית בכל השרתים שהבוט נמצא בהם
+// יצירת שרת אינטרנט פנימי קטן שמחזיק את הבוט דלוק 24/7 ב-Render
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Trofidon is Alive!\n');
+});
+
+// שרתים ב-Render חייבים להקשיב לפורט קבוע מראש
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => {
+    console.log(`שרת המניעה מאופליין פועל על פורט ${PORT}`);
+});
+
+// רישום פקודת הסלאש אוטומטית בכל השרתים
 client.once('ready', async () => {
     console.log('טרופידון מחובר ומוכן לעבודה!');
     
@@ -49,8 +62,6 @@ client.once('ready', async () => {
 
     try {
         console.log('מתחיל לרשום פקודות סלאש אוטומטית...');
-        
-        // הבוט לוקח לבד את הרשימה של השרתים שלו ורושם בהם את הפקודה מיד
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
             await rest.put(
@@ -58,8 +69,7 @@ client.once('ready', async () => {
                 { body: commands },
             );
         }
-        
-        console.log('פקודות הסלאש נרשמו בשרתים בהצלחה ויכולות לעבוד עכשיו!');
+        console.log('פקודות הסלאש נרשמו בשרתים בהצלחה!');
     } catch (error) {
         console.error('שגיאה ברישום פקודות סלאש:', error);
     }
@@ -102,7 +112,7 @@ client.on('interactionCreate', async (interaction) => {
                 .setColor('#0099ff')
                 .setTitle('🎯 איש תלוי')
                 .setDescription('• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState))
-                .setImage('https://imgur.com'); // תמונה למשחק
+                .setImage('https://imgur.com');
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
