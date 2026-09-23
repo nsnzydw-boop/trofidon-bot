@@ -28,7 +28,7 @@ const activeGames = new Map();
 // רשימת מילים למשחק
 const wordsList = ['דיסקורד', 'טרופידון', 'מחשב', 'תכנות', 'שרת', 'בוט', 'משחק'];
 
-// הגנה מושלמת מפני קריסות - מונע מהבוט להיכבות בשגיאות
+// הגנה מושלמת מפני קריסות
 process.on('unhandledRejection', (reason, promise) => {
     console.error('נלכדה שגיאה לא מטופלת:', reason);
 });
@@ -42,7 +42,6 @@ const server = http.createServer((req, res) => {
     res.end('Trofidon is Alive!\n');
 });
 
-// שרתים ב-Render חייבים להקשיב לפורט קבוע מראש
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`שרת המניעה מאופליין פועל על פורט ${PORT}`);
