@@ -17,6 +17,9 @@ const client = new Client({
     ]
 });
 
+// מאגר המשחקים הפעילים של איש תלוי
+const activeGames = new Map();
+
 // הגנה מוחלטת מפני קריסות
 process.on('unhandledRejection', (reason) => { 
     console.error('נלכדה שגיאה (דלג):', reason); 
@@ -32,11 +35,30 @@ const server = http.createServer((req, res) => {
 });
 server.listen(process.env.PORT || 10000);
 
-// רשימות הפרסים לתיבות
-const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב', 'פרס ניחומים: כלום!', 'גישה לערוץ סודי ל-24 שעות'];
-const woodPrizes = ['תפקיד מיוחד בשרת', 'תקשורת חופשית עם מנהל', 'כרטיס הגרלה חינמי'];
-const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלוף השרת לתמיד', '🎁 קופון מתנה מיוחד מהנהלת השרת'];
+// ==========================================
+// 🎁 כאן אתה יכול לשנות את הפרסים בקלות! 🎁
+// פשוט שנה את המילים בתוך הגרשיים למה שתרצה
+// ==========================================
+const regularPrizes = [
+    'נקודות לשרת', 
+    'תפקיד זמני מעוצב', 
+    'פרס ניחומים: כלום!', 
+    'גישה לערוץ סודי ל-24 שעות'
+];
 
+const woodPrizes = [
+    'תפקיד מיוחד בשרת', 
+    'תקשורת חופשית עם מנהל', 
+    'כרטיס הגרלה חינמי'
+];
+
+const goldPrizes = [
+    'רול ייחודי רק בשבילכם!', 
+    'פריט נדיר בטרופי!', 
+    '🎁 מזל כפול בהגרלות לזמן מוגבל'
+];
+
+// קישורי התמונות הרשמיים כברירת מחדל (ניתן לשינוי דרך הפקודה החדשה!)
 const images = {
     regular: {
         closed: 'https://discordapp.com',
@@ -52,20 +74,16 @@ const images = {
     }
 };
 
-// רישום פקודות סלאש ישירות לתוך השרת שלך באופן אוטומטי
+// רישום פקודות סלאש ישירות לתוך השרתים
 client.once('ready', async () => {
     console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
     
     const commandsData = [
-        // 1. פקודת SAY הרשמית שאתה רוצה!
+        // 1. פקודת SAY
         new SlashCommandBuilder()
             .setName('say')
             .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
-            .addStringOption(option => 
-                option.setName('תוכן')
-                    .setDescription('רשמו את מה שאתם רוצים שהבוט יגיד')
-                    .setRequired(true)
-            ),
+            .addStringOption(option => option.setName('תוכן').setDescription('רשמו את מה שאתם רוצים שהבוט יגיד').setRequired(true)),
             
         // 2. פקודת פתח תיבה
         new SlashCommandBuilder()
@@ -80,6 +98,35 @@ client.once('ready', async () => {
                         { name: '📦 תיבת עץ', value: 'wood' },
                         { name: '🟡 תיבת זהב', value: 'gold' }
                     )
+            ),
+
+        // 3. פקודת שינוי תמונות החדשה! 🖼️
+        new SlashCommandBuilder()
+            .setName('תמונות-תיבה')
+            .setDescription('שינוי תמונות התיבות בבוט בלייב!')
+            .addStringOption(option => 
+                option.setName('תיבה')
+                    .setDescription('בחרו איזה סוג תיבה לשנות')
+                    .setRequired(true)
+                    .addChoices(
+                        { name: '🟢 תיבה רגילה ירוקה', value: 'regular' },
+                        { name: '📦 תיבת עץ', value: 'wood' },
+                        { name: '🟡 תיבת זהב', value: 'gold' }
+                    )
+            )
+            .addStringOption(option => 
+                option.setName('מצב')
+                    .setDescription('בחרו האם לשנות את המצב הסגור או הפתוח')
+                    .setRequired(true)
+                    .addChoices(
+                        { name: '🔒 תיבה סגורה (לפני פתיחה)', value: 'closed' },
+                        { name: '🔓 תיבה פתוחה (אחרי פתיחה)', value: 'opened' }
+                    )
+            )
+            .addAttachmentOption(option => 
+                option.setName('קובץ-תמונה')
+                    .setDescription('העלו את קובץ התמונה החדש מהמחשב')
+                    .setRequired(true)
             )
     ];
 
@@ -87,13 +134,10 @@ client.once('ready', async () => {
         console.log('מתחיל רישום ישיר ומיידי לשרתים שלך...');
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
-            // רושם את הפקודות ישירות בתוך השרת הספציפי שלך בשנייה זו!
             await client.application.commands.set(commandsData, guildId);
         }
-        console.log('הפקודות עודכנו בשרת שלך בהצלחה ומפעילות את עצמן עכשיו!');
-    } catch (error) {
-        console.error('שגיאה ברישום:', error);
-    }
+        console.log('כל פקודות הסלאש כולל שינוי התמונות עודכנו בהצלחה!');
+    } catch (error) { console.error('שגיאה ברישום:', error); }
 });
 
 // הקשבה להודעות רגילות
@@ -108,18 +152,32 @@ client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isChatInputCommand() && !interaction.isButton()) return;
 
-        // הפעלת פקודת SAY
+        // 1. פקודת SAY
         if (interaction.isChatInputCommand() && interaction.commandName === 'say') {
             const messageContent = interaction.options.getString('תוכן');
-            
-            // שולח הודעה ירוקה ונסתרת שרק אתה רואה, כדי לאשר שהפקודה בוצעה
             await interaction.reply({ content: '✅ ההודעה נשלחה בהצלחה!', ephemeral: true });
-            
-            // שולח את ההודעה הרגילה לצ'אט בשם הבוט
             return await interaction.channel.send({ content: messageContent });
         }
 
-        // פקודת פתח-תיבה
+        // 2. פקודת שינוי תמונות התיבה 🖼️
+        if (interaction.isChatInputCommand() && interaction.commandName === 'תמונות-תיבה') {
+            const targetBox = interaction.options.getString('תיבה');
+            const targetStatus = interaction.options.getString('מצב');
+            const newImageAttachment = interaction.options.getAttachment('קובץ-תמונה');
+
+            // עדכון הקישור בזיכרון של הבוט בלייב!
+            images[targetBox][targetStatus] = newImageAttachment.url;
+
+            const previewEmbed = new EmbedBuilder()
+                .setColor('#9b59b6')
+                .setTitle('🖼️ התמונה עודכנה בהצלחה!')
+                .setDescription(`התמונה של **${targetBox === 'regular' ? 'תיבה רגילה' : targetBox === 'wood' ? 'תיבת עץ' : 'תיבת זהב'}** במצב **${targetStatus === 'closed' ? 'סגור 🔒' : 'פתוח 🔓'}** שונתה לתמונה שהעליתם.\n\nמכאן והלאה, בפתיחת התיבות הבאה, הבוט ישתמש בתמונה זו!`)
+                .setImage(newImageAttachment.url);
+
+            return await interaction.reply({ embeds: [previewEmbed], ephemeral: true });
+        }
+
+        // 3. פקודת פתח-תיבה
         if (interaction.isChatInputCommand() && interaction.commandName === 'פתח-תיבה') {
             const boxType = interaction.options.getString('סוג');
             let boxName, embedColor, closedImage;
@@ -141,7 +199,7 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.reply({ embeds: [startEmbed], components: [row] });
         }
 
-        // לחיצה על כפתור פתיחת התיבה
+        // 4. לחיצה על כפתור פתיחת התיבה
         if (interaction.isButton() && interaction.customId.startsWith('open_box_')) {
             const boxType = interaction.customId.replace('open_box_', '');
             let prizeList, boxName, embedColor, openedImage;
@@ -155,7 +213,7 @@ client.on('interactionCreate', async (interaction) => {
             const finalEmbed = new EmbedBuilder()
                 .setColor(embedColor)
                 .setTitle('🎉 התיבה נפתחה בהצלחה!')
-                .setDescription(`המפתח הסתובב... ונפתחה **${boxName}** על ידי ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**`)
+                .setDescription(`👑 המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**`)
                 .setImage(openedImage);
 
             return await interaction.update({ embeds: [finalEmbed], components: [] });
