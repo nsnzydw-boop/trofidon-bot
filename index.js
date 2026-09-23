@@ -33,7 +33,7 @@ client.on('messageCreate', async (message) => {
         
         // אפשרות 2: אם מישהו כותב בדיוק "מה נשמע טרופידון?"
         if (message.content === 'מה נשמע טרופידון?') {
-            await message.reply('בסדר..');
+            await message.reply('בסדר... מה איתך?');
         }
         
     } catch (error) {
