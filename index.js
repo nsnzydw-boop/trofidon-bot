@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, MessageCollector } = require('discord.js');
+const { Client, GatewayIntentBits } = require('discord.js');
 
 const client = new Client({
     intents: [
@@ -11,7 +11,7 @@ const client = new Client({
 // מאגר שישמור את המשחקים הפעילים בכל ערוץ
 const activeGames = new Map();
 
-// רשימת מילים למשחק (תוכל להוסיף או לשנות כאן מילים כרצונך!)
+// רשימת מילים למשחק
 const wordsList = ['דיסקורד', 'טרופידון', 'מחשב', 'תכנות', 'שרת', 'בוט', 'משחק'];
 
 // הגנה מושלמת מפני קריסות
@@ -23,7 +23,7 @@ process.on('uncaughtException', (err, origin) => {
 });
 
 client.once('ready', () => {
-    console.log(`הבוט \${client.user.tag} מחובר ומוכן לעבודה!`);
+    console.log(`הבוט ${client.user.tag} מחובר ומוכן לעבודה!`);
 });
 
 // הקשבה להודעות בצ'אט
@@ -31,7 +31,7 @@ client.on('messageCreate', async (message) => {
     try {
         if (message.author.bot) return;
 
-        // התגובות הרגילות שביקשת קודם
+        // התגובות הרגילות
         if (message.content === 'היי') {
             return await message.reply('היי');
         }
@@ -41,12 +41,10 @@ client.on('messageCreate', async (message) => {
 
         // פקודה להפעלת משחק איש תלוי
         if (message.content === '/איש-תלוי-הפעלות') {
-            // בדיקה אם כבר יש משחק פעיל בערוץ הזה
             if (activeGames.has(message.channel.id)) {
                 return await message.reply('❌ כבר יש משחק איש תלוי פעיל בערוץ הזה!');
             }
 
-            // בחירת מילה אקראית מהרשימה
             const secretWord = wordsList[Math.floor(Math.random() * wordsList.length)];
             const gameState = {
                 word: secretWord,
@@ -57,7 +55,7 @@ client.on('messageCreate', async (message) => {
 
             activeGames.set(message.channel.id, gameState);
 
-            await message.reply(`🎮 **משחק איש תלוי התחיל!**\nהמילה שנבחרה מכילה **\${secretWord.length}** אותיות.\nכתבו אות אחת בצ'אט כדי לנחש!\n\n\${displayWordStatus(gameState)}`);
+            await message.reply('🎮 **משחק איש תלוי התחיל!**\nהמילה שנבחרה מכילה **' + secretWord.length + '** אותיות.\nכתבו אות אחת בצ'אט כדי לנחש!\n\n' + displayWordStatus(gameState));
             return;
         }
 
@@ -66,36 +64,32 @@ client.on('messageCreate', async (message) => {
             const gameState = activeGames.get(message.channel.id);
             const guess = message.content.trim();
 
-            // בודק שמדובר באות אחת בלבד
             if (guess.length !== 1) return;
 
-            // אם האות כבר נוחשה בעבר
             if (gameState.guessedLetters.has(guess)) {
-                return await message.reply(`האות **\${guess}** כבר נוחשה! נסו אות אחרת.`);
+                return await message.reply('האות **' + guess + '** כבר נוחשה! נסו אות אחרת.');
             }
 
             gameState.guessedLetters.add(guess);
 
-            // אם הניחוש נכון
             if (gameState.word.includes(guess)) {
-                // בדיקה אם השחקנים ניחשו את כל המילה
                 const isWon = [...gameState.word].every(letter => gameState.guessedLetters.has(letter));
                 
                 if (isWon) {
                     activeGames.delete(message.channel.id);
-                    return await message.reply(`🎉 **כל הכבוד! ניחשתם את המילה!**\nהמילה הייתה: **\${gameState.word}**`);
+                    return await message.reply('🎉 **כל הכבוד! ניחשתם את המילה!**\nהמילה הייתה: **' + gameState.word + '**');
                 } else {
-                    return await message.reply(`✅ אות נכונה!\n\n\${displayWordStatus(gameState)}`);
+                    return await message.reply('✅ אות נכונה!\n\n' + displayWordStatus(gameState));
                 }
             } else {
-                // אם הניחוש שגוי
                 gameState.wrongAttempts++;
+                const remaining = gameState.maxAttempts - gameState.wrongAttempts;
                 
                 if (gameState.wrongAttempts >= gameState.maxAttempts) {
                     activeGames.delete(message.channel.id);
-                    return await message.reply(`💀 **הפסדתם! המשחק נגמר.**\nהמילה הייתה: **\${gameState.word}**`);
+                    return await message.reply('💀 **הפסדתם! המשחק נגמר.**\nהמילה הייתה: **' + gameState.word + '**');
                 } else {
-                    return await message.reply(`❌ אות לא נכונה! נשארו לכם עוד \({gameState.maxAttempts - gameState.wrongAttempts} ניסיונות.\n\n\){displayWordStatus(gameState)}`);
+                    return await message.reply('❌ אות לא נכונה! נשארו לכם עוד ' + remaining + ' ניסיונות.\n\n' + displayWordStatus(gameState));
                 }
             }
         }
@@ -110,12 +104,12 @@ function displayWordStatus(gameState) {
     let display = '';
     for (const letter of gameState.word) {
         if (gameState.guessedLetters.has(letter)) {
-            display += ` \${letter} `;
+            display += ' ' + letter + ' ';
         } else {
             display += ' ＿ ';
         }
     }
-    return `\`${display.trim()}\``;
+    return '`' + display.trim() + '`';
 }
 
 client.login(process.env.DISCORD_TOKEN);
