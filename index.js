@@ -71,7 +71,7 @@ client.once('ready', async () => {
             .addStringOption(option => option.setName('מילה').setDescription('רשמו את המילה הסודית שצריך לנחש').setRequired(true))
             .addAttachmentOption(option => option.setName('תמונה').setDescription('קובץ תמונה מהמחשב (אופציונלי)').setRequired(false)),
             
-        // 2. פקודת תיבות הפנדורה (מותאם לשם שמופיע אצלך בתמונה!)
+        // 2. פקודת תיבות הפנדורה
         new SlashCommandBuilder()
             .setName('פתח-תיבה')
             .setDescription('זמינות של תיבת פנדורה לפתיחה בשרת!')
@@ -86,7 +86,7 @@ client.once('ready', async () => {
                     )
             ),
             
-        // 3. פקודת SAY (באותיות גדולות כדי להכריח רענון!)
+        // 3. פקודת say - באותיות קטנות בלבד לפי חוקי דיסקורד!
         new SlashCommandBuilder()
             .setName('say')
             .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
@@ -98,11 +98,11 @@ client.once('ready', async () => {
     ];
 
     try {
-        console.log('מעדכן את פקודות הסלאש...');
+        console.log('מנקה ומעדכן מחדש את כל פקודות הסלאש...');
         await client.application.commands.set(commandsData);
-        console.log('כל הפקודות עודכנו וסונכרנו בהצלחה!');
+        console.log('כל 3 פקודות הסלאש עודכנו וסונכרנו בהצלחה!');
     } catch (error) {
-        console.error('שגיאה ברישום:', error);
+        console.error('שגיאה ברישום פקודות:', error);
     }
 });
 
@@ -150,7 +150,7 @@ client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isChatInputCommand() && !interaction.isButton()) return;
 
-        // 1. פקודת SAY
+        // 1. פקודת say
         if (interaction.isChatInputCommand() && interaction.commandName === 'say') {
             const messageContent = interaction.options.getString('תוכן');
             await interaction.reply({ content: 'ההודעה נשלחה בהצלחה!', ephemeral: true });
@@ -219,7 +219,7 @@ client.on('interactionCreate', async (interaction) => {
             const finalEmbed = new EmbedBuilder()
                 .setColor(embedColor)
                 .setTitle('🎉 התיבה נפתחה בהצלחה!')
-                .setDescription(`Mפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**\n\n*בהצלחה, ומי יודע... אולי הפרס הבא שלכם יהיה נדיר במיוחד!*`)
+                .setDescription(`👑 המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**\n\n*בהצלחה, ומי יודע... אולי הפרס הבא שלכם יהיה נדיר במיוחד!*`)
                 .setImage(openedImage);
 
             return await interaction.update({ embeds: [finalEmbed], components: [] });
