@@ -47,7 +47,7 @@ server.listen(PORT, () => {
     console.log(`שרת המניעה מאופליין פועל על פורט ${PORT}`);
 });
 
-// רישום פקודת הסלאש אוטומטית בכל השרתים
+// רישום פקודת הסלאש אוטומטית עם תבניות (Options)
 client.once('ready', async () => {
     console.log('טרופידון מחובר ומוכן לעבודה!');
     
@@ -55,12 +55,24 @@ client.once('ready', async () => {
         new SlashCommandBuilder()
             .setName('איש-תלוי-הפעלות')
             .setDescription('הפעלת משחק איש תלוי מעוצב בשרת')
+            // תבנית 1: נושא המשחק
+            .addStringOption(option => 
+                option.setName('נושא')
+                    .setDescription('רשמו את נושא המשחק (לדוגמה: כללי, הפעלות, חיות)')
+                    .setRequired(true)
+            )
+            // תבנית 2: קישור לתמונה
+            .addStringOption(option => 
+                option.setName('תמונה')
+                    .setDescription('הדביקו קישור לתמונה שתרצו להציג (אופציונלי)')
+                    .setRequired(false)
+            )
     ].map(command => command.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
     try {
-        console.log('מתחיל לרשום פקודות סלאש אוטומטית...');
+        console.log('מתחיל לרשום פקודות סלאש אוטומטית עם תבניות...');
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
             await rest.put(
@@ -68,7 +80,7 @@ client.once('ready', async () => {
                 { body: commands },
             );
         }
-        console.log('פקודות הסלאש נרשמו בשרתים בהצלחה!');
+        console.log('פקודות הסלאש החדשות נרשמו בשרתים בהצלחה!');
     } catch (error) {
         console.error('שגיאה ברישום פקודות סלאש:', error);
     }
@@ -99,10 +111,21 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.reply({ content: '❌ כבר יש משחק איש תלוי פעיל בערוץ הזה!', ephemeral: true });
             }
 
+            // קריאת הערכים שהמשתמש הקליד בתבניות
+            const subject = interaction.options.getString('נושא');
+            let imageUrl = interaction.options.getString('תמונה');
+            
+            // אם המשתמש לא שם תמונה, נשתמש בתמונת ברירת המחדל
+            if (!imageUrl || !imageUrl.startsWith('http')) {
+                imageUrl = 'https://imgur.com';
+            }
+
             const secretWord = wordsList[Math.floor(Math.random() * wordsList.length)];
             const gameState = {
                 word: secretWord,
-                guessedLetters: new Set()
+                guessedLetters: new Set(),
+                subject: subject,
+                image: imageUrl
             };
 
             activeGames.set(interaction.channel.id, gameState);
@@ -110,8 +133,8 @@ client.on('interactionCreate', async (interaction) => {
             const embed = new EmbedBuilder()
                 .setColor('#0099ff')
                 .setTitle('🎯 איש תלוי')
-                .setDescription('• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState))
-                .setImage('https://imgur.com');
+                .setDescription('• **הנושא הוא:** ' + gameState.subject + '\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState))
+                .setImage(gameState.image);
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -174,7 +197,7 @@ client.on('interactionCreate', async (interaction) => {
                         .setColor('#1f8b4c')
                         .setTitle('🎉 ניצחון במשחק!')
                         .setDescription('כל הכבוד! המילה המלאה פוענחה בהצלחה.\n\n👑 המילה הייתה: **' + gameState.word + '**')
-                        .setImage('https://imgur.com');
+                        .setImage(gameState.image);
                     
                     return await interaction.update({ embeds: [winEmbed], components: [] });
                 }
@@ -186,8 +209,8 @@ client.on('interactionCreate', async (interaction) => {
             const updatedEmbed = new EmbedBuilder()
                 .setColor('#0099ff')
                 .setTitle('🎯 איש תלוי')
-                .setDescription('• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n' + statusText + '\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState))
-                .setImage('https://imgur.com');
+                .setDescription('• **הנושא הוא:** ' + gameState.subject + '\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n' + statusText + '\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState))
+                .setImage(gameState.image);
 
             return await interaction.update({ embeds: [updatedEmbed] });
         }
