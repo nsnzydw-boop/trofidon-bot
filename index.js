@@ -7,7 +7,10 @@ const {
     ButtonStyle, 
     ModalBuilder, 
     TextInputBuilder, 
-    TextInputStyle 
+    TextInputStyle,
+    REST,
+    Routes,
+    SlashCommandBuilder
 } = require('discord.js');
 
 const client = new Client({
@@ -24,7 +27,7 @@ const activeGames = new Map();
 // רשימת מילים למשחק
 const wordsList = ['דיסקורד', 'טרופידון', 'מחשב', 'תכנות', 'שרת', 'בוט', 'משחק'];
 
-// הגנה מושלמת מפני קריסות - מונע מהבוט לרדת מאופליין לעולם!
+// הגנה מושלמת מפני קריסות
 process.on('unhandledRejection', (reason, promise) => {
     console.error('נלכדה שגיאה לא מטופלת:', reason);
 });
@@ -32,47 +35,69 @@ process.on('uncaughtException', (err, origin) => {
     console.error('נלכדה שגיאה חמורה:', err);
 });
 
-client.once('ready', () => {
+// רישום פקודת הסלאש בדיסקורד
+client.once('ready', async () => {
     console.log('טרופידון מחובר ומוכן לעבודה!');
+    
+    const commands = [
+        new SlashCommandBuilder()
+            .setName('איש-תלוי-הפעלות')
+            .setDescription('הפעלת משחק איש תלוי מעוצב בשרת')
+    ].map(command => command.toJSON());
+
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+
+    try {
+        console.log('מתחיל לרשום פקודות סלאש...');
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commands },
+        );
+        console.log('פקודות הסלאש נרשמו בהצלחה!');
+    } catch (error) {
+        console.error('שגיאה ברישום פקודות סלאש:', error);
+    }
 });
 
-// הקשבה להודעות בצ'אט
+// הקשבה להודעות רגילות
 client.on('messageCreate', async (message) => {
     try {
         if (message.author.bot) return;
 
-        // התשובות הרגילות
         if (message.content === 'היי') {
             return await message.reply('היי');
         }
         if (message.content === 'מה נשמע טרופידון?') {
             return await message.reply('בסדר... מה איתך?');
         }
+    } catch (error) {
+        console.error('שגיאה בהודעה רגילה:', error);
+    }
+});
 
-        // פקודת המשחק המעוצב
-        if (message.content === '/איש-תלוי-הפעלות') {
-            if (activeGames.has(message.channel.id)) {
-                return await message.reply('❌ כבר יש משחק איש תלוי פעיל בערוץ הזה!');
+// הקשבה לפקודות סלאש ואינטראקציות
+client.on('interactionCreate', async (interaction) => {
+    try {
+        // 1. הפעלת פקודת הסלאש /איש-תלוי-הפעלות
+        if (interaction.isChatInputCommand() && interaction.commandName === 'איש-תלוי-הפעלות') {
+            if (activeGames.has(interaction.channel.id)) {
+                return await interaction.reply({ content: '❌ כבר יש משחק איש תלוי פעיל בערוץ הזה!', ephemeral: true });
             }
 
             const secretWord = wordsList[Math.floor(Math.random() * wordsList.length)];
             const gameState = {
                 word: secretWord,
-                guessedLetters: new Set(),
-                maxAttempts: 6,
-                wrongAttempts: 0
+                guessedLetters: new Set()
             };
 
-            activeGames.set(message.channel.id, gameState);
+            activeGames.set(interaction.channel.id, gameState);
 
-            // יצירת ה-Embed המעוצב
             const embed = new EmbedBuilder()
                 .setColor('#0099ff')
                 .setTitle('🎯 איש תלוי')
-                .setDescription('• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState) + '\n\n❤️ ניסיונות שנשארו: ' + (gameState.maxAttempts - gameState.wrongAttempts))
-                .setImage('https://imgur.com');
+                .setDescription('• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState))
+                .setImage('https://imgur.com'); // תמונה למשחק
 
-            // יצירת כפתור לניחוש אות
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId('guess_letter_btn')
@@ -80,18 +105,10 @@ client.on('messageCreate', async (message) => {
                     .setStyle(ButtonStyle.Primary)
             );
 
-            await message.channel.send({ embeds: [embed], components: [row] });
-            return;
+            return await interaction.reply({ embeds: [embed], components: [row] });
         }
-    } catch (error) {
-        console.error('שגיאה בפקודת הודעה:', error);
-    }
-});
 
-// הקשבה ללחיצות על כפתורים וחלונות קופצים
-client.on('interactionCreate', async (interaction) => {
-    try {
-        // 1. לחיצה על כפתור "ניחוש אות" -> פתיחת חלון קופץ (Modal)
+        // 2. לחיצה על כפתור "ניחוש אות" -> חלון קופץ
         if (interaction.isButton() && interaction.customId === 'guess_letter_btn') {
             const gameState = activeGames.get(interaction.channel.id);
             if (!gameState) {
@@ -116,7 +133,7 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.showModal(modal);
         }
 
-        // 2. קבלת האות שהמשתמש הקליד
+        // 3. קבלת האות מהחלון הקופץ
         if (interaction.isModalSubmit() && interaction.customId === 'guess_letter_modal') {
             const gameState = activeGames.get(interaction.channel.id);
             if (!gameState) {
@@ -141,38 +158,26 @@ client.on('interactionCreate', async (interaction) => {
                     const winEmbed = new EmbedBuilder()
                         .setColor('#1f8b4c')
                         .setTitle('🎉 ניצחון במשחק!')
-                        .setDescription('כל הכבוד! המילה המלאה פוענחה בהצלחה.\n\n👑 המילה הייתה: **' + gameState.word + '**');
+                        .setDescription('כל הכבוד! המילה המלאה פוענחה בהצלחה.\n\n👑 המילה הייתה: **' + gameState.word + '**')
+                        .setImage('https://imgur.com');
                     
                     return await interaction.update({ embeds: [winEmbed], components: [] });
                 }
                 statusText = '✅ האות **' + guess + '** נכונה!';
             } else {
-                gameState.wrongAttempts++;
-                
-                if (gameState.wrongAttempts >= gameState.maxAttempts) {
-                    activeGames.delete(interaction.channel.id);
-                    
-                    const loseEmbed = new EmbedBuilder()
-                        .setColor('#992d22')
-                        .setTitle('💀 המשחק נגמר - הפסדתם!')
-                        .setDescription('אזלו הניסיונות שלכם.\n\n💡 המילה המסתורית הייתה: **' + gameState.word + '**');
-                        
-                    return await interaction.update({ embeds: [loseEmbed], components: [] });
-                }
-                statusText = '❌ האות **' + guess + '** אינה נכונה!';
+                statusText = '❌ האות **' + guess + '** אינה נכונה! (אין הגבלת ניסיונות, המשיכו לנסות)';
             }
 
-            // עדכון ה-Embed
             const updatedEmbed = new EmbedBuilder()
                 .setColor('#0099ff')
                 .setTitle('🎯 איש תלוי')
-                .setDescription('• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n' + statusText + '\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState) + '\n\n❤️ ניסיונות שנשארו: ' + (gameState.maxAttempts - gameState.wrongAttempts))
+                .setDescription('• **הנושא הוא:** כללי\n• לאחר ניחוש המילה לא תוכלו להשתתף בסבב שנית.\n\n' + statusText + '\n\n**המילה המסתורית:**\n' + displayWordStatus(gameState))
                 .setImage('https://imgur.com');
 
             return await interaction.update({ embeds: [updatedEmbed] });
         }
     } catch (error) {
-        console.error('שגיאה בעיבוד כפתור:', error);
+        console.error('שגיאה בעיבוד פקודת סלאש או כפתור:', error);
     }
 });
 
