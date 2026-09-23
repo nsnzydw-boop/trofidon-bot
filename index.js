@@ -26,14 +26,20 @@ client.on('messageCreate', async (message) => {
         // מונע מהבוט לענות לעצמו או לבוטים אחרים
         if (message.author.bot) return;
 
-        // אם מישהו כותב בדיוק "היי", הבוט יענה לו "מודרת"
+        // אפשרות 1: אם מישהו כותב בדיוק "היי"
         if (message.content === 'היי') {
-            await message.reply('מודרת');
+            await message.reply('היי');
         }
+        
+        // אפשרות 2: אם מישהו כותב בדיוק "מה נשמע טרופידון?"
+        if (message.content === 'מה נשמע טרופידון?') {
+            await message.reply('בסדר..');
+        }
+        
     } catch (error) {
         console.error('שגיאה בזמן מענה:', error);
     }
 });
 
-// התחברות באמצעות הטוקן הסודי (שנגדיר עוד מעט ב-Render)
+// התחברות באמצעות הטוקן הסודי
 client.login(process.env.DISCORD_TOKEN);
