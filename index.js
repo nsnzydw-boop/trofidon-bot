@@ -5,8 +5,6 @@ const {
     ActionRowBuilder, 
     ButtonBuilder, 
     ButtonStyle,
-    REST,
-    Routes,
     SlashCommandBuilder
 } = require('discord.js');
 const http = require('http');
@@ -64,7 +62,7 @@ const images = {
 client.once('ready', async () => {
     console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
     
-    const commands = [
+    const commandsData = [
         // 1. פקודת איש תלוי
         new SlashCommandBuilder()
             .setName('איש-תלוי-הפעלות')
@@ -73,9 +71,9 @@ client.once('ready', async () => {
             .addStringOption(option => option.setName('מילה').setDescription('רשמו את המילה הסודית שצריך לנחש').setRequired(true))
             .addAttachmentOption(option => option.setName('תמונה').setDescription('קובץ תמונה מהמחשב (אופציונלי)').setRequired(false)),
             
-        // 2. פקודת תיבות הפנדורה
+        // 2. פקודת תיבות הפנדורה (מותאם לשם שמופיע אצלך בתמונה!)
         new SlashCommandBuilder()
-            .setName('פתיחת-תיבה')
+            .setName('פתח-תיבה')
             .setDescription('זמינות של תיבת פנדורה לפתיחה בשרת!')
             .addStringOption(option => 
                 option.setName('סוג')
@@ -88,7 +86,7 @@ client.once('ready', async () => {
                     )
             ),
             
-        // 3. פקודת SAY
+        // 3. פקודת SAY (באותיות גדולות כדי להכריח רענון!)
         new SlashCommandBuilder()
             .setName('say')
             .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
@@ -97,19 +95,14 @@ client.once('ready', async () => {
                     .setDescription('רשמו את מה שאתם רוצים שהבוט יגיד')
                     .setRequired(true)
             )
-    ].map(command => command.toJSON());
-
-    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+    ];
 
     try {
-        console.log('מתחיל לרשום פקודות סלאש...');
-        const guilds = await client.guilds.fetch();
-        for (const [guildId] of guilds) {
-            await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: commands });
-        }
-        console.log('כל פקודות הסלאש נרשמו בהצלחה!');
+        console.log('מעדכן את פקודות הסלאש...');
+        await client.application.commands.set(commandsData);
+        console.log('כל הפקודות עודכנו וסונכרנו בהצלחה!');
     } catch (error) {
-        console.error('שגיאה ברישום פקודות:', error);
+        console.error('שגיאה ברישום:', error);
     }
 });
 
@@ -165,7 +158,7 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // 2. פקודת פתיחת-תיבה
-        if (interaction.isChatInputCommand() && interaction.commandName === 'פתיחת-תיבה') {
+        if (interaction.isChatInputCommand() && interaction.commandName === 'פתח-תיבה') {
             const boxType = interaction.options.getString('סוג');
             let boxName, embedColor, closedImage;
 
@@ -233,3 +226,7 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // 4. פקודת איש תלוי
+        if (interaction.isChatInputCommand() && interaction.commandName === 'איש-תלוי-הפעלות') {
+            if (activeGames.has(interaction.channel.id)) {
+                return await interaction.reply({ content: '❌ כבר יש משחק פעיל בערוץ זה!', ephemeral: true });
+            }
