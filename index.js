@@ -73,9 +73,9 @@ client.once('ready', async () => {
             .addStringOption(option => option.setName('מילה').setDescription('רשמו את המילה הסודית שצריך לנחש').setRequired(true))
             .addAttachmentOption(option => option.setName('תמונה').setDescription('קובץ תמונה מהמחשב (אופציונלי)').setRequired(false)),
             
-        // 2. פקודת תיבות הפנדורה
+        // 2. פקודת תיבות הפנדורה החדשה והנקייה!
         new SlashCommandBuilder()
-            .setName('פתח-תיבה')
+            .setName('פתיחת-תיבה')
             .setDescription('זמינות של תיבת פנדורה לפתיחה בשרת!')
             .addStringOption(option => 
                 option.setName('סוג')
@@ -92,7 +92,7 @@ client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
     try {
-        console.log('מתחיל לרשום פקודות סלאש...');
+        console.log('מתחיל לרשום פקודות סלאש חדשות...');
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
             await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: commands });
@@ -145,8 +145,8 @@ client.on('messageCreate', async (message) => {
 // הקשבה לפקודות סלאש ולחיצות על כפתור פתיחת התיבה
 client.on('interactionCreate', async (interaction) => {
     try {
-        // 1. הפעלת פקודת הסלאש /פתח-תיבה (מציב תיבה סגורה בשרת)
-        if (interaction.isChatInputCommand() && interaction.commandName === 'פתח-תיבה') {
+        // 1. הפעלת פקודת הסלאש /פתיחת-תיבה
+        if (interaction.isChatInputCommand() && interaction.commandName === 'פתיחת-תיבה') {
             const boxType = interaction.options.getString('סוג');
             let boxName, embedColor, closedImage;
 
@@ -168,9 +168,8 @@ client.on('interactionCreate', async (interaction) => {
                 .setColor(embedColor)
                 .setTitle('🎁 תיבת פנדורה הגיעה לשרת!')
                 .setDescription(`מנהל הציב **${boxName}** מוזהבת ומסתורית בצ'אט!\n\n🔹 **מה צריך לעשות?**\nכל מה שנותר לכם הוא ללחוץ על כפתור ה-**"פתח תיבה"** למטה כדי לפתוח אותה ולגלות במה זכיתם!`)
-                .setImage(closedImage); // תמונה גדולה ומרכזית של התיבה הסגורה!
+                .setImage(closedImage);
 
-            // יצירת כפתור לפתיחת התיבה
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`open_box_${boxType}`)
@@ -181,7 +180,7 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.reply({ embeds: [startEmbed], components: [row] });
         }
 
-        // 2. לחיצה על כפתור פתיחת התיבה (משנה לתמונה פתוחה ומגריל פרס)
+        // 2. לחיצה על כפתור פתיחת התיבה
         if (interaction.isButton() && interaction.customId.startsWith('open_box_')) {
             const boxType = interaction.customId.replace('open_box_', '');
             let prizeList, boxName, embedColor, openedImage;
@@ -209,7 +208,7 @@ client.on('interactionCreate', async (interaction) => {
                 .setColor(embedColor)
                 .setTitle('🎉 התיבה נפתחה בהצלחה!')
                 .setDescription(`המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**\n\n*בהצלחה, ומי יודע... אולי הפרס הבא שלכם יהיה נדיר במיוחד!*`)
-                .setImage(openedImage); // תמונה גדולה ומרכזית של התיבה הפתוחה!
+                .setImage(openedImage);
 
             return await interaction.update({ embeds: [finalEmbed], components: [] });
         }
@@ -227,3 +226,9 @@ client.on('interactionCreate', async (interaction) => {
             };
             activeGames.set(interaction.channel.id, gameState);
             const embed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n**המילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
+            return await interaction.reply({ embeds: [embed] });
+        }
+    } catch (error) { console.error(error); }
+});
+
+function displayWordStatus(gameState) {
