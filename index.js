@@ -1,188 +1,36 @@
-const { 
-    Client, 
-    GatewayIntentBits, 
-    EmbedBuilder, 
-    ActionRowBuilder, 
-    ButtonBuilder, 
-    ButtonStyle,
-    SlashCommandBuilder
-} = require('discord.js');
-const http = require('http');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
-});
+module.exports = {
+    // הגדרת הפקודה והשדות שלה
+    data: new SlashCommandBuilder()
+        .setName('הוספת-תיבה')
+        .setDescription('הוספת תיבה למשתמש ספציפי בשרת')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild) // רק מנהלים יכולים להשתמש בפקודה
+        
+        // שדה 1: שם המשתמש
+        .addUserOption(option => 
+            option.setName('משתמש')
+                .setDescription('בחר את המשתמש שיקבל את התיבה')
+                .setRequired(true))
+                
+        // שדה 2: סוג התיבה
+        .addStringOption(option => 
+            option.setName('סוג-התיבה')
+                .setDescription('בחר או הקלד את סוג התיבה (למשל: פנדורה, זהב, נדירה)')
+                .setRequired(true)),
 
-// מאגר המשחקים הפעילים של איש תלוי
-const activeGames = new Map();
+    // מה קורה כשהפקודה מופעלת
+    async execute(interaction) {
+        // משיכת הנתונים שהמשתמש הזין
+        const targetUser = interaction.options.getUser('משתמש');
+        const boxType = interaction.options.getString('סוג-התיבה');
 
-// =======================================================
-// 👑 נעילת הבוט: שים כאן את ה-ID האישי שלך מדיסקורד! 👑
-// =======================================================
-const OWNER_ID = 'שים_כאן_את_האיידי_האישי_שלך';
+        // כאן בעתיד נחבר את הלוגיקה של מסד הנתונים (Database) שלך כדי לשמור את התיבה
+        // כרגע הבוט רק יחזיר הודעת אישור מעוצבת
 
-// הגנה מוחלטת מפני קריסות
-process.on('unhandledRejection', (reason) => { console.error('שגיאה:', reason); });
-process.on('uncaughtException', (err) => { console.error('שגיאה חמורה:', err); });
-
-// שרת אינטרנט פנימי לשמירה על הבוט ער 24/7 ב-Render
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Trofidon is Alive!\n');
-});
-server.listen(process.env.PORT || 10000);
-
-// רשימות הפרסים לתיבות
-const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב', 'פרס ניחומים: כלום!', 'גישה לערוץ סודי ל-24 שעות'];
-const woodPrizes = ['תפקיד מיוחד בשרת', 'תקשורת חופשית עם מנהל', 'כרטיס הגרלה חינמי'];
-const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלוף השרת לתמיד', '🎁 קופון מתנה מיוחד מהנהלת השרת'];
-
-// קישורי התמונות של התיבות
-const images = {
-    regular: {
-        closed: 'https://discordapp.com',
-        opened: 'https://discordapp.com'
+        await interaction.reply({
+            content: `🎁 **התיבה נוספה בהצלחה!**\n👤 **שם המשתמש:** ${targetUser}\n📦 **סוג התיבה:** ${boxType}`,
+            ephemeral: false // שנה ל-true אם אתה רוצה שרק המנהל שכתב את הפקודה יראה את ההודעה
+        });
     },
-    wood: {
-        closed: 'https://discordapp.com',
-        opened: 'https://discordapp.com'
-    },
-    gold: {
-        closed: 'https://discordapp.com',
-        opened: 'https://discordapp.com'
-    }
 };
-
-// רישום פקודות סלאש אוטומטית בדיסקורד
-client.once('ready', async () => {
-    console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
-    
-    const commandsData = [
-        new SlashCommandBuilder()
-            .setName('say')
-            .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
-            .addStringOption(option => option.setName('תוכן').setDescription('רשמו את מה שאתם רוצים שהבוט יגיד').setRequired(true)),
-            
-        new SlashCommandBuilder()
-            .setName('פתח-תיבה')
-            .setDescription('זמינות של תיבת פנדורה לפתיחה בשרת!')
-            .addStringOption(option => 
-                option.setName('סוג').setDescription('בחרו את סוג התיבה').setRequired(true)
-                    .addChoices(
-                        { name: '🟢 תיבה רגילה', value: 'regular' },
-                        { name: '📦 תיבת עץ', value: 'wood' },
-                        { name: '🟡 תיבת זהב', value: 'gold' }
-                    )
-            ),
-
-        new SlashCommandBuilder()
-            .setName('תמונות-תיבה')
-            .setDescription('שינוי תמונות התיבות בבוט בלייב!')
-            .addStringOption(option => option.setName('תיבה').setDescription('בחרו איזה סוג תיבה לשנות').setRequired(true)
-                .addChoices(
-                    { name: '🟢 תיבה רגילה ירוקה', value: 'regular' },
-                    { name: '📦 תיבת עץ', value: 'wood' },
-                    { name: '🟡 תיבת זהב', value: 'gold' }
-                )
-            )
-            .addStringOption(option => option.setName('מצב').setDescription('בחרו האם לשנות את המצב הסגור או הפתוח').setRequired(true)
-                .addChoices(
-                    { name: '🔒 תיבה סגורה (לפני פתיחה)', value: 'closed' },
-                    { name: '🔓 תיבה פתוחה (אחרי פתיחה)', value: 'opened' }
-                )
-            )
-            .addAttachmentOption(option => option.setName('קובץ-תמונה').setDescription('העלו את קובץ התמונה החדש מהמחשב').setRequired(true)),
-
-        new SlashCommandBuilder()
-            .setName('איש-תלוי-הפעלות')
-            .setDescription('הפעלת משחק איש תלוי מעוצב בשרת')
-            .addStringOption(option => option.setName('נושא').setDescription('רשמו את נושא המשחק').setRequired(true))
-            .addStringOption(option => option.setName('מילה').setDescription('רשמו את המילה הסודית שצריך לנחש').setRequired(true))
-            .addAttachmentOption(option => option.setName('תמונה').setDescription('קובץ תמונה מהמחשב (אופציונלי)').setRequired(false))
-    ];
-
-    try {
-        const guilds = await client.guilds.fetch();
-        for (const [guildId] of guilds) {
-            await client.application.commands.set(commandsData, guildId);
-        }
-        console.log('כל פקודות הסלאש עודכנו בשרת שלך בהצלחה!');
-    } catch (error) { console.error('שגיאה ברישום:', error); }
-});
-
-// הקשבה להודעות בצ'אט (תגובות רגילות וניחושי איש תלוי)
-client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-    if (message.content === 'היי') return await message.reply('היי');
-    if (message.content === 'מה נשמע טרופידון?') return await message.reply('בסדר... מה איתך?');
-
-    // מנגנון ניחוש איש תלוי בצ'אט (כאן כולם יכולים להשתתף ולנחש אותיות!)
-    if (activeGames.has(message.channel.id)) {
-        const gameState = activeGames.get(message.channel.id);
-        const guess = message.content.trim();
-        if (guess.length !== 1) return;
-        if (gameState.guessedLetters.has(guess)) return await message.reply(`האות **${guess}** כבר נוחשה!`);
-
-        gameState.guessedLetters.add(guess);
-        let statusText = '';
-        if (gameState.word.includes(guess)) {
-            const isWon = [...gameState.word].every(letter => gameState.guessedLetters.has(letter));
-            if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`המילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
-            statusText = `✅ האות **${guess}** נכונה!`;
-        } else { statusText = `❌ האות **${guess}** אינה נכונה!`; }
-
-        const updatedEmbed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n${statusText}\n\n**המילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
-        return await message.reply({ embeds: [updatedEmbed] });
-    }
-});
-
-// הקשבה לפקודות סלאש ואינטראקציות
-client.on('interactionCreate', async (interaction) => {
-    try {
-        // אם מדובר בלחיצה על כפתור פתיחת התיבה - כאן כולם יכולים ללחוץ ולפתוח את התיבה שהצבת!
-        if (interaction.isButton() && interaction.customId.startsWith('open_box_')) {
-            const boxType = interaction.customId.replace('open_box_', '');
-            let prizeList, boxName, embedColor, openedImage;
-
-            if (boxType === 'regular') { prizeList = regularPrizes; boxName = 'תיבה רגילה ירוקה 🟢'; embedColor = '#2ecc71'; openedImage = images.regular.opened; }
-            else if (boxType === 'wood') { prizeList = woodPrizes; boxName = 'תיבת עץ 📦'; embedColor = '#e67e22'; openedImage = images.wood.opened; }
-            else if (boxType === 'gold') { prizeList = goldPrizes; boxName = 'תיבת זהב 🟡'; embedColor = '#f1c40f'; openedImage = images.gold.opened; }
-
-            const randomPrize = prizeList[Math.floor(Math.random() * prizeList.length)];
-            const finalEmbed = new EmbedBuilder().setColor(embedColor).setTitle('🎉 התיבה נפתחה בהצלחה!').setDescription(`👑 המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**`).setImage(openedImage);
-            return await interaction.update({ embeds: [finalEmbed], components: [] });
-        }
-
-        // 🔒 בדיקת אבטחה לפקודות סלאש: רק אתה יכול להקליד ולהפעיל את הפקודות!
-        if (interaction.isChatInputCommand()) {
-            if (interaction.user.id !== OWNER_ID) {
-                return await interaction.reply({ content: '❌ השגיאה: אין לך הרשאות להשתמש בבוט זה. הפקודות חסומות ומיועדות לבעלי הבוט בלייב בלבד!', ephemeral: true });
-            }
-
-            // 1. פקודת SAY
-            if (interaction.commandName === 'say') {
-                const messageContent = interaction.options.getString('תוכן');
-                await interaction.reply({ content: '✅ ההודעה נשלחה בהצלחה!', ephemeral: true });
-                return await interaction.channel.send({ content: messageContent });
-            }
-
-            // 2. פקודת תמונות-תיבה
-            if (interaction.commandName === 'תמונות-תיבה') {
-                const targetBox = interaction.options.getString('תיבה');
-                const targetStatus = interaction.options.getString('מצב');
-                const newImageAttachment = interaction.options.getAttachment('קובץ-תמונה');
-                images[targetBox][targetStatus] = newImageAttachment.url;
-                const previewEmbed = new EmbedBuilder().setColor('#9b59b6').setTitle('🖼️ התמונה עודכנה!').setDescription(`התמונה עודכנה בהצלחה.`).setImage(newImageAttachment.url);
-                return await interaction.reply({ embeds: [previewEmbed], ephemeral: true });
-            }
-
-            // 3. פקודת פתח-תיבה
-            if (interaction.commandName === 'פתח-תיבה') {
-                const boxType = interaction.options.getString('סוג');
-                let boxName, embedColor, closedImage;
-                if (boxType === 'regular') { boxName = 'תיבה רגילה ירוקה 🟢'; embedColor = '#2ecc71'; closedImage = images.regular.closed; }
-                else if (boxType === 'wood') { boxName = 'תיבת עץ 📦'; embedColor = '#e67e22'; closedImage = images.wood.closed; }
