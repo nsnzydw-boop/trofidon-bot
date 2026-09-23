@@ -22,7 +22,7 @@ const client = new Client({
 // מאגר המשחקים הפעילים של איש תלוי
 const activeGames = new Map();
 
-// הגנה מוחלטת מפני קריסות - מונע מהבוט להיכבות בשגיאות
+// הגנה מוחלטת מפני קריסות
 process.on('unhandledRejection', (reason) => { 
     console.error('נלכדה שגיאה (דלג):', reason); 
 });
@@ -86,6 +86,16 @@ client.once('ready', async () => {
                         { name: '📦 תיבת עץ', value: 'wood' },
                         { name: '🟡 תיבת זהב', value: 'gold' }
                     )
+            ),
+            
+        // 3. פקודת SAY החדשה!
+        new SlashCommandBuilder()
+            .setName('say')
+            .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
+            .addStringOption(option => 
+                option.setName('תוכן')
+                    .setDescription('רשמו את מה שאתם רוצים שהבוט יגיד')
+                    .setRequired(true)
             )
     ].map(command => command.toJSON());
 
@@ -142,11 +152,24 @@ client.on('messageCreate', async (message) => {
     } catch (error) { console.error(error); }
 });
 
-// הקשבה לפקודות סלאש ולחיצות על כפתור פתיחת התיבה
+// הקשבה לפקודות סלאש ואינטראקציות
 client.on('interactionCreate', async (interaction) => {
     try {
-        // 1. הפעלת פקודת הסלאש /פתיחת-תיבה
-        if (interaction.isChatInputCommand() && interaction.commandName === 'פתיחת-תיבה') {
+        if (!interaction.isChatInputCommand()) return;
+
+        // 1. הפעלת פקודת הסלאש /say החדשה
+        if (interaction.commandName === 'say') {
+            const messageContent = interaction.options.getString('תוכן');
+            
+            // שולח הודעה סודית למפעיל שהכל בוצע (אחרים לא יראו את זה)
+            await interaction.reply({ content: 'ההודעה נשלחה בהצלחה!', ephemeral: true });
+            
+            // שולח את ההודעה הגלויה לכולם בשם הבוט
+            return await interaction.channel.send({ content: messageContent });
+        }
+
+        // 2. הפעלת פקודת הסלאש /פתיחת-תיבה
+        if (interaction.commandName === 'פתיחת-תיבה') {
             const boxType = interaction.options.getString('סוג');
             let boxName, embedColor, closedImage;
 
@@ -180,7 +203,7 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.reply({ embeds: [startEmbed], components: [row] });
         }
 
-        // 2. לחיצה על כפתור פתיחת התיבה
+        // 3. לחיצה על כפתור פתיחת התיבה
         if (interaction.isButton() && interaction.customId.startsWith('open_box_')) {
             const boxType = interaction.customId.replace('open_box_', '');
             let prizeList, boxName, embedColor, openedImage;
@@ -213,15 +236,3 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.update({ embeds: [finalEmbed], components: [] });
         }
 
-        // 3. קוד הפעלת איש תלוי
-        if (interaction.isChatInputCommand() && interaction.commandName === 'איש-תלוי-הפעלות') {
-            if (activeGames.has(interaction.channel.id)) {
-                return await interaction.reply({ content: '❌ כבר יש משחק פעיל בערוץ זה!', ephemeral: true });
-            }
-            const gameState = {
-                word: interaction.options.getString('מילה').trim(),
-                guessedLetters: new Set(),
-                subject: interaction.options.getString('נושא'),
-                image: interaction.options.getAttachment('תמונה') ? interaction.options.getAttachment('תמונה').url : 'https://imgur.com'
-            };
-            activeGames.set(interaction.channel.id, gameState);
