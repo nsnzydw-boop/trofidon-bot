@@ -44,7 +44,7 @@ const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב'
 const woodPrizes = ['תפקיד מיוחד בשרת', 'תקשורת חופשית עם מנהל', 'כרטיס הגרלה חינמי'];
 const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלוף השרת לתמיד', '🎁 קופון מתנה מיוחד מהנהלת השרת'];
 
-// קישורי התמונות שהעלית לתיבות (כולל תיבת העץ שפתחתי עבורך)
+// קישורי התמונות שהעלית לתיבות
 const images = {
     regular: {
         closed: 'https://imgur.com', // תיבה ירוקה סגורה
@@ -52,7 +52,7 @@ const images = {
     },
     wood: {
         closed: 'https://imgur.com', // תיבת עץ סגורה
-        opened: 'https://imgur.com'   // תיבת עץ פתוחה (ערוכה!)
+        opened: 'https://imgur.com'   // תיבת עץ פתוחה
     },
     gold: {
         closed: 'https://imgur.com', // תיבת זהב סגורה
@@ -168,9 +168,9 @@ client.on('interactionCreate', async (interaction) => {
                 .setColor(embedColor)
                 .setTitle('🎁 תיבת פנדורה הגיעה לשרת!')
                 .setDescription(`מנהל הציב **${boxName}** מוזהבת ומסתורית בצ'אט!\n\n🔹 **מה צריך לעשות?**\nכל מה שנותר לכם הוא ללחוץ על כפתור ה-**"פתח תיבה"** למטה כדי לפתוח אותה ולגלות במה זכיתם!`)
-                .setImage(closedImage);
+                .setImage(closedImage); // תמונה גדולה ומרכזית של התיבה הסגורה!
 
-            // יצירת כפתור לפתיחת התיבה המיועדת
+            // יצירת כפתור לפתיחת התיבה
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`open_box_${boxType}`)
@@ -181,7 +181,7 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.reply({ embeds: [startEmbed], components: [row] });
         }
 
-        // 2. לחיצה על כפתור פתיחת התיבה (משנה את התמונה לפתוחה ומגריל פרס)
+        // 2. לחיצה על כפתור פתיחת התיבה (משנה לתמונה פתוחה ומגריל פרס)
         if (interaction.isButton() && interaction.customId.startsWith('open_box_')) {
             const boxType = interaction.customId.replace('open_box_', '');
             let prizeList, boxName, embedColor, openedImage;
@@ -209,9 +209,8 @@ client.on('interactionCreate', async (interaction) => {
                 .setColor(embedColor)
                 .setTitle('🎉 התיבה נפתחה בהצלחה!')
                 .setDescription(`המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**\n\n*בהצלחה, ומי יודע... אולי הפרס הבא שלכם יהיה נדיר במיוחד!*`)
-                .setImage(openedImage); // מציג את התמונה הפתוחה המתאימה!
+                .setImage(openedImage); // תמונה גדולה ומרכזית של התיבה הפתוחה!
 
-            // מעדכן את ההודעה המקורית (מעלים את הכפתור ומשנה לתמונה הפתוחה)
             return await interaction.update({ embeds: [finalEmbed], components: [] });
         }
 
@@ -227,3 +226,4 @@ client.on('interactionCreate', async (interaction) => {
                 image: interaction.options.getAttachment('תמונה') ? interaction.options.getAttachment('תמונה').url : 'https://imgur.com'
             };
             activeGames.set(interaction.channel.id, gameState);
+            const embed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n**המילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
