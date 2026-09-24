@@ -8,12 +8,15 @@ const {
     SlashCommandBuilder, 
     PermissionsBitField,
     StringSelectMenuBuilder,
-    StringSelectMenuOptionBuilder
+    StringSelectMenuOptionBuilder,
+    REST,
+    Routes
 } = require('discord.js');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// הגדרת הבוט והרשאות
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -22,9 +25,12 @@ const client = new Client({
     ]
 });
 
+// הגדרת משתנים חיוניים
+const TOKEN = process.env.DISCORD_TOKEN || "YOUR_BOT_TOKEN_HERE";
 const activeGames = new Map();
 const DB_FILE = path.join(__dirname, 'inventory_db.json');
 
+// פונקציות טעינה ושמירה חסינות קריסה לתיבות
 function loadInventory() {
     try {
         if (!fs.existsSync(DB_FILE)) { fs.writeFileSync(DB_FILE, JSON.stringify({}), 'utf-8'); return {}; }
@@ -37,11 +43,11 @@ function saveInventory(inventory) {
     catch (error) { console.error('שגיאה בשמירת המלאי:', error); }
 }
 
-// הגנה מוחלטת מפני קריסות שרת
+// הגנה גלובלית מפני קריסות שרת ב-Render
 process.on('unhandledRejection', (reason) => { console.error('נלכדה שגיאה (Rejection):', reason); });
 process.on('uncaughtException', (err) => { console.error('נלכדה שגיאה חמורה (Exception):', err); });
 
-// שרת אינטרנט פנימי חובה עבור Render
+// שרת אינטרנט פנימי שחובה בשביל Render שלא יקרוס
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -49,6 +55,7 @@ const server = http.createServer((req, res) => {
 });
 server.listen(process.env.PORT || 10000);
 
+// פרסים ותמונות
 const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב', 'פרס ניחומים: כלום!', 'גישה לערוץ סודי ל-24 שעות'];
 const woodPrizes = ['תפקיד מיוחד בשרת', 'תקשורת חופשית עם מנהל', 'כרטיס הגרלה חינמי'];
 const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלוף השרת לתמיד', '🎁 קופון מתנה מיוחד מהנהלת השרת'];
@@ -59,61 +66,69 @@ const images = {
     gold: { closed: 'https://discordapp.com', opened: 'https://discordapp.com' }
 };
 
-// רישום פקודות סלאש בצורה גלובלית ויציבה
+// הגדרת מערך הפקודות בצורה נקייה לחלוטין
+const commandsData = [
+    new SlashCommandBuilder()
+        .setName('מדריך')
+        .setDescription('הצגת מדריך המשחקייה ותפריט בחירת הסברים על משחקים'),
+
+    new SlashCommandBuilder()
+        .setName('say')
+        .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
+        .addStringOption(option => option.setName('תוכן').setDescription('רשמו את מה שאתם רוצים שהבוט יגיד').setRequired(true)),
+        
+    new SlashCommandBuilder()
+        .setName('פתח-תיבה')
+        .setDescription('זמינות של תיבת פנדורה לפתיחה בשרת לכולם!')
+        .addStringOption(option => 
+            option.setName('סוג').setDescription('בחרו את סוג התיבה').setRequired(true)
+                .addChoices(
+                    { name: '🟢 תיבה רגילה', value: 'regular' },
+                    { name: '📦 תיבת עץ', value: 'wood' },
+                    { name: '🟡 תיבת זהב', value: 'gold' }
+                )
+        ),
+
+    new SlashCommandBuilder()
+        .setName('הוסף-תיבה')
+        .setDescription('הענקת תיבת פנדורה אישית למלאי המאובטח של המשתמש!')
+        .addUserOption(option => option.setName('משתמש').setDescription('בחרו את המשתמש שיקבל את התיבה').setRequired(true))
+        .addStringOption(option => 
+            option.setName('סוג').setDescription('בחרו את סוג התיבה להענקה').setRequired(true)
+                .addChoices(
+                    { name: '🟢 תיבה רגילה', value: 'regular' },
+                    { name: '📦 תיבת עץ', value: 'wood' },
+                    { name: '🟡 תיבת זהב', value: 'gold' }
+                )
+        ),
+
+    new SlashCommandBuilder()
+        .setName('איש-תלוי-הפעלות')
+        .setDescription('הפעלת משחק איש תלוי מעוצב בשרת')
+        .addStringOption(option => option.setName('נושא').setDescription('רשמו את נושא המשחק').setRequired(true))
+        .addStringOption(option => option.setName('מילה').setDescription('רשמו את המילה הסודית שצריך לנחש').setRequired(true))
+        .addAttachmentOption(option => option.setName('תמונה').setDescription('קובץ תמונה מהמחשב (אופציונלי)').setRequired(false))
+].map(command => command.toJSON());
+
+// אירוע עליית הבוט לאוויר ודחיפת הפקודות בכוח לדיסקורד
 client.once('ready', async () => {
     console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
     
-    const commandsData = [
-        new SlashCommandBuilder()
-            .setName('מדריך')
-            .setDescription('הצגת מדריך המשחקייה ותפריט בחירת הסברים על משחקים'),
-
-        new SlashCommandBuilder()
-            .setName('say')
-            .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
-            .addStringOption(option => option.setName('תוכן').setDescription('רשמו את מה שאתם רוצים שהבוט יגיד').setRequired(true)),
-            
-        new SlashCommandBuilder()
-            .setName('פתח-תיבה')
-            .setDescription('זמינות של תיבת פנדורה לפתיחה בשרת לכולם!')
-            .addStringOption(option => 
-                option.setName('סוג').setDescription('בחרו את סוג התיבה').setRequired(true)
-                    .addChoices(
-                        { name: '🟢 תיבה רגילה', value: 'regular' },
-                        { name: '📦 תיבת עץ', value: 'wood' },
-                        { name: '🟡 תיבת זהב', value: 'gold' }
-                    )
-            ),
-
-        new SlashCommandBuilder()
-            .setName('הוסף-תיבה')
-            .setDescription('הענקת תיבת פנדורה אישית למלאי המאובטח של המשתמש!')
-            .addUserOption(option => option.setName('משתמש').setDescription('בחרו את המשתמש שיקבל את התיבה').setRequired(true))
-            .addStringOption(option => 
-                option.setName('סוג').setDescription('בחרו את סוג התיבה להענקה').setRequired(true)
-                    .addChoices(
-                        { name: '🟢 תיבה רגילה', value: 'regular' },
-                        { name: '📦 תיבת עץ', value: 'wood' },
-                        { name: '🟡 תיבת זהב', value: 'gold' }
-                    )
-            ),
-
-        new SlashCommandBuilder()
-            .setName('איש-תלוי-הפעלות')
-            .setDescription('הפעלת משחק איש תלוי מעוצב בשרת')
-            .addStringOption(option => option.setName('נושא').setDescription('רשמו את נושא המשחק').setRequired(true))
-            .addStringOption(option => option.setName('מילה').setDescription('רשמו את המילה הסודית שצריך לנחש').setRequired(true))
-            .addAttachmentOption(option => option.setName('תמונה').setDescription('קובץ תמונה מהמחשב (אופציונלי)').setRequired(false))
-    ];
-
+    // מנגנון ה-REST שדוחף את פקודות הסלאש ישירות לחשבון הבוט
+    const rest = new REST({ version: '10' }).setToken(TOKEN);
     try {
-        // רישום פקודות בצורה גלובלית ישירות לאפליקציה (הכי בטוח ללא קריסות)
-        await client.application.commands.set(commandsData);
-        console.log('כל פקודות הסלאש עודכנו בצורה גלובלית בהצלחה!');
-    } catch (error) { console.error('שגיאה ברישום פקודות:', error); }
+        console.log('מתחיל לרענן ולרשום את פקודות הסלאש בדיסקורד...');
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commandsData },
+        );
+        console.log('✅ הצלחה! כל פקודות הסלאש עודכנו וסונכרנו בהצלחה בדיסקורד!');
+    } catch (error) {
+        console.error('❌ שגיאה חמורה ברישום הפקודות ישירות מול דיסקורד:', error);
+    }
 });
 
-// פונקציה לייקור תפריט הבחירה
+// פונקציית ייצור תפריט משחקים
 function createGamesSelectMenu() {
     const select = new StringSelectMenuBuilder()
         .setCustomId('game_guide_select')
@@ -128,10 +143,9 @@ function createGamesSelectMenu() {
     return new ActionRowBuilder().addComponents(select);
 }
 
-// קולט אינטראקציות (פקודות סלאש, תפריטים וכפתורים)
+// קולט אינטראקציות (פקודות סלאש ותפריטים)
 client.on('interactionCreate', async (interaction) => {
     try {
-        // --- 1. פקודות סלאש ---
         if (interaction.isChatInputCommand()) {
             if (interaction.commandName === 'מדריך') {
                 const mainEmbed = new EmbedBuilder()
@@ -160,10 +174,9 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // --- 2. תפריטי בחירה ---
         if (interaction.isStringSelectMenu()) {
             if (interaction.customId === 'game_guide_select') {
-                const selectedGame = interaction.values[0]; // תיקון אינדקס בחירה
+                const selectedGame = interaction.values[0];
                 let gameTitle = '';
                 let gameDescription = '';
 
@@ -190,11 +203,3 @@ client.on('interactionCreate', async (interaction) => {
                     .setDescription(gameDescription)
                     .setFooter({ text: 'תוכלו לבחור משחק אחר בתפריט בכל עת כדי לקרוא עליו.' });
 
-                const backRow = createGamesSelectMenu();
-                return await interaction.update({ embeds: [gameEmbed], components: [backRow] });
-            }
-        }
-
-        // --- 3. כפתורים ---
-        if (interaction.isButton()) {
-            if (interaction.customId.startsWith('open_box_global_')) {
