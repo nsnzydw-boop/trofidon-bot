@@ -24,22 +24,30 @@ const activeGames = new Map();
 // בנק התיבות המאובטח של המשתמשים
 const userInventory = new Map();
 
-// הגנה מוחלטת מפני קריסות
-process.on('unhandledRejection', (reason) => { console.error('שגיאה:', reason); });
-process.on('uncaughtException', (err) => { console.error('שגיאה חמורה:', err); });
+// הגנה מוחלטת מפני קריסות - מונע מהבוט להיכבות בשגיאות
+process.on('unhandledRejection', (reason) => { 
+    console.error('נלכדה שגיאה (דלג):', reason); 
+});
+process.on('uncaughtException', (err) => { 
+    console.error('נלכדה שגיאה חמורה (דלג):', err); 
+});
 
-// שרת אינטרנט פנימי לשמירה על הבוט ער 24/7 ב-Render
+// שרת אינטרנט פנימי חסין לשמירה על הבוט ער 24/7 ב-Render
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: "alive", bot: "Trofidon" }));
+    res.end(JSON.stringify({ status: "alive", bot: "Trofidon", timestamp: Date.now() }));
 });
-server.listen(process.env.PORT || 10000);
+
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => {
+    console.log(`שרת Keep-Alive פעיל בהצלחה על פורט ${PORT}`);
+});
 
 // רשימות הפרסים לתיבות
 const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב', 'פרס ניחומים: כלום!', 'גישה לערוץ סודי ל-24 שעות'];
 const woodPrizes = ['תפקיד מיוחד בשרת', 'תקשורת חופשית עם מנהל', 'כרטיס הגרלה חינמי'];
-const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלוף השרת לתמיד', '🎁 קופון מתנה מיוחד מהנהלת השרת'];
+const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלוף השרת לתמיד', '🎁 קופון מתנה מיותר מהנהלת השרת'];
 
 // קישורי התמונות המקוריים של התיבות שלך
 const images = {
@@ -57,7 +65,7 @@ const images = {
     }
 };
 
-// רישום כל הפקודות מחדש ישירות לתוך השרתים שלך
+// רישום פקודות סלאש אוטומטית בדיסקורד
 client.once('ready', async () => {
     console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
     
@@ -109,11 +117,11 @@ client.once('ready', async () => {
     try {
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
-            // דוחף את כל 4 הפקודות ישר לשרת שלך!
+            // דוחף את כל 4 הפקודות ישירות לשרת שלך ללא דיליי
             await client.application.commands.set(commandsData, guildId);
         }
         console.log('כל 4 פקודות הסלאש עודכנו בשרת שלך בהצלחה!');
-    } catch (error) { console.error('שגיאה ברישום:', error); }
+    } catch (error) { console.error('שגיאה ברישום פקודות:', error); }
 });
 
 // הקשבה להודעות בצ'אט (בשביל !פתחתיבה ותגובות רגילות)
@@ -134,7 +142,7 @@ client.on('messageCreate', async (message) => {
             }
 
             const boxType = userBoxes.shift();
-            userInventory.set(userId, userBoxes);
+            userInventory.set(userId, userBoxes); // מעדכן את המלאי שנותר
 
             let boxName, embedColor, closedImage;
             if (boxType === 'regular') { boxName = 'תיבה רגילה ירוקה 🟢'; embedColor = '#2ecc71'; closedImage = images.regular.closed; }
@@ -150,7 +158,7 @@ client.on('messageCreate', async (message) => {
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`open_box_${boxType}_${userId}`)
+                    .setCustomId(`open_box_${boxType}_${userId}`) // נועל את הכפתור על ה-ID של המשתמש בלבד
                     .setLabel(`פתח את התיבה שלי! 🔓`)
                     .setStyle(ButtonStyle.Primary)
             );
@@ -169,7 +177,7 @@ client.on('messageCreate', async (message) => {
             let statusText = '';
             if (gameState.word.includes(guess)) {
                 const isWon = [...gameState.word].every(letter => gameState.guessedLetters.has(letter));
-                if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`Mהמילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
+                if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`המילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
                 statusText = `✅ האות **${guess}** נכונה!`;
             } else { statusText = `❌ האות **${guess}** אינה נכונה!`; }
 
@@ -179,7 +187,7 @@ client.on('messageCreate', async (message) => {
     } catch (error) { console.error(error); }
 });
 
-// הקשבה לפקודות סלאש ואינטראקציות
+// הקשבה לפקודות סלאש ואינטראקציות (לחיצות כפתור)
 client.on('interactionCreate', async (interaction) => {
     try {
         // לחיצה על כפתור פתיחת התיבה
@@ -188,8 +196,9 @@ client.on('interactionCreate', async (interaction) => {
             const boxType = parts[2];
             const allowedUserId = parts[3];
 
+            // 🔒 אבטחה מלאה: מוודא שאף אחד אחר לא יכול לגנוב את הלחיצה בתיבות אישיות
             if (allowedUserId && interaction.user.id !== allowedUserId) {
-                return await interaction.reply({ content: '❌ התיבה הזו שייכת למשתמש אחר בלבד!', ephemeral: true });
+                return await interaction.reply({ content: '❌ התיבה הזו שייכת למשתמש אחר בלבד! אין באפשרותך לפתוח אותה.', ephemeral: true });
             }
 
             let prizeList, boxName, embedColor, openedImage;
@@ -198,9 +207,3 @@ client.on('interactionCreate', async (interaction) => {
             else if (boxType === 'gold') { prizeList = goldPrizes; boxName = 'תיבת זהב 🟡'; embedColor = '#f1c40f'; openedImage = images.gold.opened; }
 
             const randomPrize = prizeList[Math.floor(Math.random() * prizeList.length)];
-            const finalEmbed = new EmbedBuilder()
-                .setColor(embedColor)
-                .setTitle('🎉 התיבה נפתחה בהצלחה!')
-                .setDescription(`👑 המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**`)
-                .setImage(openedImage);
-
