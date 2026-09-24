@@ -4,11 +4,13 @@ const {
     EmbedBuilder, 
     ActionRowBuilder, 
     ButtonBuilder, 
-    ButtonStyle,
-    SlashCommandBuilder,
-    PermissionsBitField
+    ButtonStyle, 
+    SlashCommandBuilder, 
+    PermissionsBitField 
 } = require('discord.js');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
 const client = new Client({
     intents: [
@@ -18,15 +20,38 @@ const client = new Client({
     ]
 });
 
-// מאגר המשחקים הפעילים של איש תלוי
+// מאגר המשחקים הפעילים של איש תלוי (זמני בלבד בזמן משחק)
 const activeGames = new Map();
 
-// בנק התיבות המאובטח של המשתמשים
-const userInventory = new Map();
+// נתיב לקובץ האחסון הקבוע של התיבות
+const DB_FILE = path.join(__dirname, 'inventory_db.json');
 
-// הגנה מוחלטת מפני קריסות
-process.on('unhandledRejection', (reason) => { console.error('נלכדה שגיאה:', reason); });
-process.on('uncaughtException', (err) => { console.error('נלכדה שגיאה חמורה:', err); });
+// פונקציות עזר לקריאה ושמירה חסינות קריסה מהדיסק הקשיח
+function loadInventory() {
+    try {
+        if (!fs.existsSync(DB_FILE)) {
+            fs.writeFileSync(DB_FILE, JSON.stringify({}), 'utf-8');
+            return {};
+        }
+        const data = fs.readFileSync(DB_FILE, 'utf-8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('שגיאה בטעינת המלאי מהקובץ:', error);
+        return {};
+    }
+}
+
+function saveInventory(inventory) {
+    try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(inventory, null, 4), 'utf-8');
+    } catch (error) {
+        console.error('שגיאה בשמירת המלאי לקובץ:', error);
+    }
+}
+
+// הגנה מוחלטת מפני קריסות (תופס שגיאות ומונע מהתהליך למות)
+process.on('unhandledRejection', (reason) => { console.error('נלכדה שגיאה (Rejection):', reason); });
+process.on('uncaughtException', (err) => { console.error('נלכדה שגיאה חמורה (Exception):', err); });
 
 // שרת אינטרנט פנימי לשמירה על הבוט ער 24/7 ב-Render
 const server = http.createServer((req, res) => {
@@ -34,7 +59,9 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: "alive", bot: "Trofidon" }));
 });
-server.listen(process.env.PORT || 10000);
+server.listen(process.env.PORT || 10000, () => {
+    console.log('שרת ה-Web הפנימי מוכן ומקשיב לפורט!');
+});
 
 // רשימות הפרסים לתיבות
 const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב', 'פרס ניחומים: כלום!', 'גישה לערוץ סודי ל-24 שעות'];
@@ -43,18 +70,9 @@ const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלו�
 
 // קישורי התמונות המקוריים של התיבות
 const images = {
-    regular: {
-        closed: 'https://discordapp.com',
-        opened: 'https://discordapp.com'
-    },
-    wood: {
-        closed: 'https://discordapp.com',
-        opened: 'https://discordapp.com'
-    },
-    gold: {
-        closed: 'https://discordapp.com',
-        opened: 'https://discordapp.com'
-    }
+    regular: { closed: 'https://discordapp.com', opened: 'https://discordapp.com' },
+    wood: { closed: 'https://discordapp.com', opened: 'https://discordapp.com' },
+    gold: { closed: 'https://discordapp.com', opened: 'https://discordapp.com' }
 };
 
 // רישום פקודות סלאש אוטומטית בדיסקורד
@@ -103,13 +121,13 @@ client.once('ready', async () => {
     try {
         const guilds = await client.guilds.fetch();
         for (const [guildId] of guilds) {
-            await client.application.commands.set(commandsData, guildId);
+            await client.application.commands.set(commandsData, guildId).catch(() => null);
         }
         console.log('כל פקודות הסלאש עודכנו בשרתים בהצלחה!');
     } catch (error) { console.error('שגיאה ברישום פקודות:', error); }
 });
 
-// הקשבה להודעות בצ'אט (מערכת פקודות צ'אט חסינה ומובנית לגיבוי מלא)
+// הקשבה להודעות בצ'אט
 client.on('messageCreate', async (message) => {
     try {
         if (message.author.bot) return;
@@ -117,71 +135,76 @@ client.on('messageCreate', async (message) => {
         if (message.content === 'היי') return await message.reply('היי');
         if (message.content === 'מה נשמע טרופידון?') return await message.reply('בסדר... מה איתך?');
 
-        // 1. גיבוי לצ'אט לפקודת !say
+        // 1. פקודת !say
         if (message.content.startsWith('!say')) {
             if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
             const text = message.content.replace('!say', '').trim();
             if (!text) return await message.reply('❌ נא לרשום טקסט אחרי הפקודה.');
-            await message.delete();
+            await message.delete().catch(() => null);
             return await message.channel.send({ content: text });
         }
 
-        // 2. גיבוי לצ'אט לפקודת !פתח-תיבה (כללית לכולם)
+        // 2. פקודת !פתח-תיבה (כללית לכולם בצ'אט עם כפתור)
         if (message.content.startsWith('!פתח-תיבה')) {
             if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
             const args = message.content.split(' ');
             let boxType = args[1];
-            if (boxType === 'זהב') boxType = 'gold'; else if (boxType === 'עץ') boxType = 'wood'; else boxType = 'רגיל' ? boxType = 'regular' : null;
+            if (boxType === 'זהב') boxType = 'gold'; 
+            else if (boxType === 'עץ') boxType = 'wood'; 
+            else if (boxType === 'רגיל' || boxType === 'רגילה') boxType = 'regular';
 
             if (!['regular', 'wood', 'gold'].includes(boxType)) return await message.reply('⚠️ שימוש: `!פתח-תיבה [רגיל / עץ / זהב]`');
             
             let boxName, embedColor, closedImage;
-            if (boxType === 'regular') { boxName = 'תיבה רגילה ירוקה 🟢'; embedColor = '#2ecc71'; closedImage = images.regular.closed; }
-            else if (boxType === 'wood') { boxName = 'תיבת עץ 📦'; embedColor = '#e67e22'; closedImage = images.wood.closed; }
-            else if (boxType === 'gold') { boxName = 'תיבת זהב 🟡'; embedColor = '#f1c40f'; closedImage = images.gold.closed; }
+            if (boxType === 'regular') { boxName = 'תיבה רגילה ירוקה 🟢'; embedColor = 0x2ecc71; closedImage = images.regular.closed; }
+            else if (boxType === 'wood') { boxName = 'תיבת עץ 📦'; embedColor = 0xe67e22; closedImage = images.wood.closed; }
+            else if (boxType === 'gold') { boxName = 'תיבת זהב 🟡'; embedColor = 0xf1c40f; closedImage = images.gold.closed; }
 
             const startEmbed = new EmbedBuilder().setColor(embedColor).setTitle('🎁 תיבת פנדורה הגיעה לשרת!').setDescription(`מנהל הציב **${boxName}** בצ'אט!\n\nלחצו על הכפתור למטה כדי לפתוח!`).setImage(closedImage);
-            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`open_box_${boxType}`).setLabel('פתח תיבה 🔓').setStyle(ButtonStyle.Success));
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`open_box_global_${boxType}`).setLabel('פתח תיבה 🔓').setStyle(ButtonStyle.Success));
             return await message.channel.send({ embeds: [startEmbed], components: [row] });
         }
 
-        // 3. גיבוי לצ'אט לפקודת !הוסף-תיבה (אישית למשתמש)
+        // 3. פקודת !הוסף-תיבה (הוספה למלאי השמור והקבוע)
         if (message.content.startsWith('!הוסף-תיבה')) {
             if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
             const args = message.content.split(' ');
             const targetUser = message.mentions.users.first();
             let boxType = args[2];
-            if (boxType === 'זהב') boxType = 'gold'; else if (boxType === 'עץ') boxType = 'wood'; else if (boxType === 'רגיל' || boxType === 'רגילה') boxType = 'regular';
+            if (boxType === 'זהב') boxType = 'gold'; 
+            else if (boxType === 'עץ') boxType = 'wood'; 
+            else if (boxType === 'רגיל' || boxType === 'רגילה') boxType = 'regular';
 
             if (!targetUser || !['regular', 'wood', 'gold'].includes(boxType)) {
                 return await message.reply('⚠️ שימוש: `!הוסף-תיבה [@משתמש] [רגיל / עץ / זהב]`');
             }
 
-            const currentBoxes = userInventory.get(targetUser.id) || [];
-            currentBoxes.push(boxType);
-            userInventory.set(targetUser.id, currentBoxes);
+            const inventory = loadInventory();
+            if (!inventory[targetUser.id]) inventory[targetUser.id] = [];
+            
+            inventory[targetUser.id].push(boxType);
+            saveInventory(inventory);
 
             let boxName = boxType === 'regular' ? 'תיבה רגילה ירוקה 🟢' : boxType === 'wood' ? 'תיבת עץ 📦' : 'תיבת זהב 🟡';
-            const notifyEmbed = new EmbedBuilder().setColor('#3498db').setTitle('💰 המלאי האישי עודכן!').setDescription(`הוענקה **${boxName}** בהצלחה למלאי המאובטח של ${targetUser}!\n\n💬 המשתמש יכול כעת לרשום בצ'אט: \`!פתחתיבה\` כדי לפתוח אותה!`).setFooter({ text: `סה"כ תיבות במלאי שלו: ${currentBoxes.length}` });
+            const notifyEmbed = new EmbedBuilder().setColor(0x3498db).setTitle('💰 המלאי האישי עודכן!').setDescription(`הוענקה **${boxName}** בהצלחה למלאי המאובטח של ${targetUser}!\n\n💬 המשתמש יכול כעת לרשום בצ'אט: \`!פתחתיבה\` כדי לפתוח אותה!`).setFooter({ text: `סה"כ תיבות במלאי שלו: ${inventory[targetUser.id].length}` });
             return await message.reply({ embeds: [notifyEmbed] });
         }
 
-        // פקודת !פתחתיבה לפתיחת המלאי האישי (תמיד עובדת בצ'אט!)
+        // 4. פקודת !פתחתיבה אישית (הקוד שהיה חסר!)
         if (message.content === '!פתחתיבה') {
             const userId = message.author.id;
-            const userBoxes = userInventory.get(userId) || [];
+            const inventory = loadInventory();
+            const userBoxes = inventory[userId] || [];
 
             if (userBoxes.length === 0) {
-                return await message.reply('אין לך תיבות לפתוח');
+                return await message.reply('❌ אין לך אף תיבה במלאי האישי! תבקש ממנהל שיוסיף לך.');
             }
 
-            const boxType = userBoxes.shift();
-            userInventory.set(userId, userBoxes);
+            // לוקח את התיבה האחרונה שקיבל
+            const boxType = userBoxes.pop(); 
+            inventory[userId] = userBoxes;
+            saveInventory(inventory); // שמירה מיידית לקובץ כדי שלא יקרוס וישוכפל
 
-            let boxName, embedColor, closedImage;
-            if (boxType === 'regular') { boxName = 'תיבה רגילה ירוקה 🟢'; embedColor = '#2ecc71'; closedImage = images.regular.closed; }
-            else if (boxType === 'wood') { boxName = 'תיבת עץ 📦'; embedColor = '#e67e22'; closedImage = images.wood.closed; }
-            else if (boxType === 'gold') { boxName = 'תיבת זהב 🟡'; embedColor = '#f1c40f'; closedImage = images.gold.closed; }
-
-            const openEmbed = new EmbedBuilder().setColor(embedColor).setTitle('🎁 פתיחת תיבת פנדורה מהמלאי האישי!').setDescription(`היי ${message.author},\nשלפת מהבנק האישי שלך **${boxName}** מוזהבת ונעולה!\n\n🔒 **רק אתה** יכול ללחוץ על הכפתור למטה כדי לפתוח אותה ולגלות את הפרס!`).setImage(closedImage).setFooter({ text: `תיבות שנותרו לך במלאי: ${userBoxes.length}` });
-            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`open_box_${boxType}_${userId}`).setLabel(`פתח את התיבה שלי! 🔓`).setStyle(ButtonStyle.Primary));
+            let prizes = boxType === 'gold' ? goldPrizes : boxType === 'wood' ? woodPrizes : regularPrizes;
+            const randomPrize = prizes[Math.floor(Math.random() * prizes.length)];
+            
