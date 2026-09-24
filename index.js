@@ -82,7 +82,6 @@ client.once('ready', async () => {
                     )
             ),
 
-        // 🔥 הפיקס החדש - שינוי שם הפקודה לריענון מהיר בדיסקורד!
         new SlashCommandBuilder()
             .setName('נתינת-תיבה')
             .setDescription('הענקת תיבת פנדורה אישית למלאי המאובטח של המשתמש!')
@@ -186,11 +185,11 @@ client.on('messageCreate', async (message) => {
             let statusText = '';
             if (gameState.word.includes(guess)) {
                 const isWon = [...gameState.word].every(letter => gameState.guessedLetters.has(letter));
-                if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`Mהמילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
+                if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`المילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
                 statusText = `✅ האות **${guess}** נכונה!`;
             } else { statusText = `❌ האות **${guess}** אינה נכונה!`; }
 
-            const updatedEmbed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n${statusText}\n\n**Mילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
+            const updatedEmbed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n${statusText}\n\n**המילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
             return await message.reply({ embeds: [updatedEmbed] });
         }
     } catch (error) { console.error(error); }
