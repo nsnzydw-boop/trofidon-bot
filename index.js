@@ -6,7 +6,9 @@ const {
     ButtonBuilder, 
     ButtonStyle, 
     SlashCommandBuilder, 
-    PermissionsBitField 
+    PermissionsBitField,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder
 } = require('discord.js');
 const http = require('http');
 const fs = require('fs');
@@ -20,66 +22,50 @@ const client = new Client({
     ]
 });
 
-// מאגר המשחקים הפעילים של איש תלוי (זמני בלבד בזמן משחק)
 const activeGames = new Map();
-
-// נתיב לקובץ האחסון הקבוע של התיבות
 const DB_FILE = path.join(__dirname, 'inventory_db.json');
 
-// פונקציות עזר לקריאה ושמירה חסינות קריסה מהדיסק הקשיח
 function loadInventory() {
     try {
-        if (!fs.existsSync(DB_FILE)) {
-            fs.writeFileSync(DB_FILE, JSON.stringify({}), 'utf-8');
-            return {};
-        }
-        const data = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('שגיאה בטעינת המלאי מהקובץ:', error);
-        return {};
-    }
+        if (!fs.existsSync(DB_FILE)) { fs.writeFileSync(DB_FILE, JSON.stringify({}), 'utf-8'); return {}; }
+        return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+    } catch (error) { console.error('שגיאה בטעינת המלאי:', error); return {}; }
 }
 
 function saveInventory(inventory) {
-    try {
-        fs.writeFileSync(DB_FILE, JSON.stringify(inventory, null, 4), 'utf-8');
-    } catch (error) {
-        console.error('שגיאה בשמירת המלאי לקובץ:', error);
-    }
+    try { fs.writeFileSync(DB_FILE, JSON.stringify(inventory, null, 4), 'utf-8'); } 
+    catch (error) { console.error('שגיאה בשמירת המלאי:', error); }
 }
 
-// הגנה מוחלטת מפני קריסות (תופס שגיאות ומונע מהתהליך למות)
 process.on('unhandledRejection', (reason) => { console.error('נלכדה שגיאה (Rejection):', reason); });
 process.on('uncaughtException', (err) => { console.error('נלכדה שגיאה חמורה (Exception):', err); });
 
-// שרת אינטרנט פנימי לשמירה על הבוט ער 24/7 ב-Render
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: "alive", bot: "Trofidon" }));
 });
-server.listen(process.env.PORT || 10000, () => {
-    console.log('שרת ה-Web הפנימי מוכן ומקשיב לפורט!');
-});
+server.listen(process.env.PORT || 10000);
 
-// רשימות הפרסים לתיבות
 const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב', 'פרס ניחומים: כלום!', 'גישה לערוץ סודי ל-24 שעות'];
 const woodPrizes = ['תפקיד מיוחד בשרת', 'תקשורת חופשית עם מנהל', 'כרטיס הגרלה חינמי'];
 const goldPrizes = ['👑 מפתח לפעילות VIP', '💎 תפקיד אלוף השרת לתמיד', '🎁 קופון מתנה מיוחד מהנהלת השרת'];
 
-// קישורי התמונות המקוריים של התיבות
 const images = {
     regular: { closed: 'https://discordapp.com', opened: 'https://discordapp.com' },
     wood: { closed: 'https://discordapp.com', opened: 'https://discordapp.com' },
     gold: { closed: 'https://discordapp.com', opened: 'https://discordapp.com' }
 };
 
-// רישום פקודות סלאש אוטומטית בדיסקורד
+// רישום פקודות סלאש (כולל פקודת המדריך החדשה)
 client.once('ready', async () => {
     console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
     
     const commandsData = [
+        new SlashCommandBuilder()
+            .setName('מדריך')
+            .setDescription('הצגת מדריך המשחקייה ותפריט בחירת הסברים על משחקים'),
+
         new SlashCommandBuilder()
             .setName('say')
             .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
@@ -123,88 +109,91 @@ client.once('ready', async () => {
         for (const [guildId] of guilds) {
             await client.application.commands.set(commandsData, guildId).catch(() => null);
         }
-        console.log('כל פקודות הסלאש עודכנו בשרתים בהצלחה!');
+        console.log('כל פקודות הסלאש עודכנו בהצלחה!');
     } catch (error) { console.error('שגיאה ברישום פקודות:', error); }
 });
 
-// הקשבה להודעות בצ'אט
-client.on('messageCreate', async (message) => {
+// פונקציה לייצור תפריט הבחירה של המשחקים כדי לא לשכפל קוד
+function createGamesSelectMenu() {
+    const select = new StringSelectMenuBuilder()
+        .setCustomId('game_guide_select')
+        .setPlaceholder('לחץ כאן למידע על משחקים')
+        .addOptions(
+            new StringSelectMenuOptionBuilder().setLabel('ארץ עיר').setValue('game_country_city').setEmoji('🌍'),
+            new StringSelectMenuOptionBuilder().setLabel('תפוס שם').setValue('game_catch_name').setEmoji('❗'),
+            new StringSelectMenuOptionBuilder().setLabel('הראשון ש...').setValue('game_first_to').setEmoji('🐱'),
+            new StringSelectMenuOptionBuilder().setLabel('מילים מבולבלות').setValue('game_scrambled').setEmoji('😳'),
+            new StringSelectMenuOptionBuilder().setLabel('מילה אות').setValue('game_word_letter').setEmoji('⭐')
+        );
+    return new ActionRowBuilder().addComponents(select);
+}
+
+// קולט פקודות סלאש ואינטראקציות (כפתורים ותפריטים)
+client.on('interactionCreate', async (interaction) => {
     try {
-        if (message.author.bot) return;
-        
-        if (message.content === 'היי') return await message.reply('היי');
-        if (message.content === 'מה נשמע טרופידון?') return await message.reply('בסדר... מה איתך?');
+        // --- 1. טיפול בפקודות סלאש ---
+        if (interaction.isChatInputCommand()) {
+            if (interaction.commandName === 'מדריך') {
+                const mainEmbed = new EmbedBuilder()
+                    .setColor('#5865F2')
+                    .setTitle('📚 מדריך המשחקייה - טרופידון')
+                    .setDescription(
+                        `כאן תוכלו לשחק במשחקים שונים, ליהנות, להשתפר ולהרוויח פרסים שווים במיוחד.\n\n` +
+                        `**הפקודות פועלות אך ורק בחדר המשחקייה.**\n` +
+                        `כדי להשתמש בהן, הקפידו לכתוב תמיד סימן קריאה (!) לפני שם המשחק.\n\n` +
+                        `בכל פעם שתשתתפו בפקודה מהמשחקייה, תקבלו אסימונים.\n` +
+                        `באמצעות האסימונים ניתן לרכוש תיבות ובעזרתן רולים נדירים.\n\n` +
+                        `⚠️ **שימו לב:** שימוש מופרז או ספאם של פקודות רק כדי לצבור אסימונים עלול להוביל לאזהרה חמורה או להרחקה קבועה מהמשחקייה.\n\n` +
+                        `**לבוסטרים יש יתרונות מיוחדים:**\n` +
+                        `נקודות כפולות על כל שימוש, וכן הטבות נוספות בחנויות ובעדכונים.\n\n` +
+                        `את כמות האסימונים שלכם תוכלו לבדוק בעזרת הפקודה \`!תיק\`.\n` +
+                        `אם תתייגו משתמש אחר אחרי הפקודה, תוכלו לראות את התיק שלו במקום את שלכם.\n\n` +
+                        `**ומה עושים עם האסימונים?**\n` +
+                        `אפשר לרכוש בעזרתם רולים יוקרתיים!\n` +
+                        `לרכישת רולים הקלידו \`!חנות\`, ושם תראו את מחירי הרולים.\n\n` +
+                        `**מאחלים לכם המון בהצלחה!**\n` +
+                        `לפרטים נוספים על משחקים ספציפיים - השתמשו בתפריט המצורף להודעה.`
+                    );
 
-        // 1. פקודת !say
-        if (message.content.startsWith('!say')) {
-            if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
-            const text = message.content.replace('!say', '').trim();
-            if (!text) return await message.reply('❌ נא לרשום טקסט אחרי הפקודה.');
-            await message.delete().catch(() => null);
-            return await message.channel.send({ content: text });
-        }
-
-        // 2. פקודת !פתח-תיבה (כללית לכולם בצ'אט עם כפתור)
-        if (message.content.startsWith('!פתח-תיבה')) {
-            if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
-            const args = message.content.split(' ');
-            let boxType = args[1];
-            if (boxType === 'זהב') boxType = 'gold'; 
-            else if (boxType === 'עץ') boxType = 'wood'; 
-            else if (boxType === 'רגיל' || boxType === 'רגילה') boxType = 'regular';
-
-            if (!['regular', 'wood', 'gold'].includes(boxType)) return await message.reply('⚠️ שימוש: `!פתח-תיבה [רגיל / עץ / זהב]`');
-            
-            let boxName, embedColor, closedImage;
-            if (boxType === 'regular') { boxName = 'תיבה רגילה ירוקה 🟢'; embedColor = 0x2ecc71; closedImage = images.regular.closed; }
-            else if (boxType === 'wood') { boxName = 'תיבת עץ 📦'; embedColor = 0xe67e22; closedImage = images.wood.closed; }
-            else if (boxType === 'gold') { boxName = 'תיבת זהב 🟡'; embedColor = 0xf1c40f; closedImage = images.gold.closed; }
-
-            const startEmbed = new EmbedBuilder().setColor(embedColor).setTitle('🎁 תיבת פנדורה הגיעה לשרת!').setDescription(`מנהל הציב **${boxName}** בצ'אט!\n\nלחצו על הכפתור למטה כדי לפתוח!`).setImage(closedImage);
-            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`open_box_global_${boxType}`).setLabel('פתח תיבה 🔓').setStyle(ButtonStyle.Success));
-            return await message.channel.send({ embeds: [startEmbed], components: [row] });
-        }
-
-        // 3. פקודת !הוסף-תיבה (הוספה למלאי השמור והקבוע)
-        if (message.content.startsWith('!הוסף-תיבה')) {
-            if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
-            const args = message.content.split(' ');
-            const targetUser = message.mentions.users.first();
-            let boxType = args[2];
-            if (boxType === 'זהב') boxType = 'gold'; 
-            else if (boxType === 'עץ') boxType = 'wood'; 
-            else if (boxType === 'רגיל' || boxType === 'רגילה') boxType = 'regular';
-
-            if (!targetUser || !['regular', 'wood', 'gold'].includes(boxType)) {
-                return await message.reply('⚠️ שימוש: `!הוסף-תיבה [@משתמש] [רגיל / עץ / זהב]`');
+                const row = createGamesSelectMenu();
+                return await interaction.reply({ embeds: [mainEmbed], components: [row] });
             }
-
-            const inventory = loadInventory();
-            if (!inventory[targetUser.id]) inventory[targetUser.id] = [];
             
-            inventory[targetUser.id].push(boxType);
-            saveInventory(inventory);
-
-            let boxName = boxType === 'regular' ? 'תיבה רגילה ירוקה 🟢' : boxType === 'wood' ? 'תיבת עץ 📦' : 'תיבת זהב 🟡';
-            const notifyEmbed = new EmbedBuilder().setColor(0x3498db).setTitle('💰 המלאי האישי עודכן!').setDescription(`הוענקה **${boxName}** בהצלחה למלאי המאובטח של ${targetUser}!\n\n💬 המשתמש יכול כעת לרשום בצ'אט: \`!פתחתיבה\` כדי לפתוח אותה!`).setFooter({ text: `סה"כ תיבות במלאי שלו: ${inventory[targetUser.id].length}` });
-            return await message.reply({ embeds: [notifyEmbed] });
+            // כאן אפשר להוסיף את שאר לוגיקת פקודות הסלאש (say, פתח-תיבה וכו') במידת הצורך
         }
 
-        // 4. פקודת !פתחתיבה אישית (הקוד שהיה חסר!)
-        if (message.content === '!פתחתיבה') {
-            const userId = message.author.id;
-            const inventory = loadInventory();
-            const userBoxes = inventory[userId] || [];
+        // --- 2. טיפול בתפריטי בחירה (Select Menus) ---
+        if (interaction.isStringSelectMenu()) {
+            if (interaction.customId === 'game_guide_select') {
+                const selectedGame = interaction.values[0];
+                let gameTitle = '';
+                let gameDescription = '';
+                let embedColor = '#3498db';
 
-            if (userBoxes.length === 0) {
-                return await message.reply('❌ אין לך אף תיבה במלאי האישי! תבקש ממנהל שיוסיף לך.');
-            }
+                // כאן אתה יכול לערוך ולכתוב את ההסברים האמיתיים לכל משחק!
+                if (selectedGame === 'game_country_city') {
+                    gameTitle = '🌍 משחק: ארץ עיר';
+                    gameDescription = 'הסבר על משחק ארץ עיר:\nהבוט יבחר אות אקראית, והראשון שיכתוב ארץ, עיר, חי, צומח או דומם באות הזו יזכה באסימונים!';
+                } else if (selectedGame === 'game_catch_name') {
+                    gameTitle = '❗ משחק: תפוס שם';
+                    gameDescription = 'הסבר על משחק תפוס שם:\nהבוט יציג שם של דמות או חפץ, ועליכם לתפוס ולכתוב אותו הכי מהר שניתן!';
+                } else if (selectedGame === 'game_first_to') {
+                    gameTitle = '🐱 משחק: הראשון ש...';
+                    gameDescription = 'הסבר על משחק הראשון ש...:\nהבוט יתן משימה מהירה (למשל: הראשון שיכתוב חתול בצ\'אט), מי שמקליד ראשון מנצח!';
+                } else if (selectedGame === 'game_scrambled') {
+                    gameTitle = '😳 משחק: מילים מבולבלות';
+                    gameDescription = 'הסבר על משחק מילים מבולבלות:\nהבוט יבלבל את אותיות המילה (למשל: "חלחונ"), ועליכם לגלות מה המילה המקורית ("שולחן")!';
+                } else if (selectedGame === 'game_word_letter') {
+                    gameTitle = '⭐ משחק: מילה אות';
+                    gameDescription = 'הסבר על משחק מילה אות:\nהבוט יבקש מילה שמתחילה באות מסוימת ומסתיימת באות אחרת, עליכם למצוא מילה מתאימה במהירות!';
+                }
 
-            // לוקח את התיבה האחרונה שקיבל
-            const boxType = userBoxes.pop(); 
-            inventory[userId] = userBoxes;
-            saveInventory(inventory); // שמירה מיידית לקובץ כדי שלא יקרוס וישוכפל
+                const gameEmbed = new EmbedBuilder()
+                    .setColor(embedColor)
+                    .setTitle(gameTitle)
+                    .setDescription(gameDescription)
+                    .setFooter({ text: 'תוכלו לבחור משחק אחר בתפריט בכל עת כדי לקרוא עליו.' });
 
-            let prizes = boxType === 'gold' ? goldPrizes : boxType === 'wood' ? woodPrizes : regularPrizes;
-            const randomPrize = prizes[Math.floor(Math.random() * prizes.length)];
-            
+                // כפתור חזרה למדריך הראשי
+                const backRow = createGamesSelectMenu();
+                
