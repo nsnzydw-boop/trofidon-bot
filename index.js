@@ -5,6 +5,7 @@ const {
     ActionRowBuilder, 
     ButtonBuilder, 
     ButtonStyle,
+    SlashCommandBuilder,
     PermissionsBitField
 } = require('discord.js');
 const http = require('http');
@@ -56,58 +57,72 @@ const images = {
     }
 };
 
-client.once('ready', () => {
+// רישום כל הפקודות מחדש ישירות לתוך השרתים שלך
+client.once('ready', async () => {
     console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
+    
+    const commandsData = [
+        // 1. פקודת SAY
+        new SlashCommandBuilder()
+            .setName('say')
+            .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
+            .addStringOption(option => option.setName('תוכן').setDescription('רשמו את מה שאתם רוצים שהבוט יגיד').setRequired(true)),
+            
+        // 2. פקודת פתח-תיבה (כללית לכולם)
+        new SlashCommandBuilder()
+            .setName('פתח-תיבה')
+            .setDescription('זמינות של תיבת פנדורה לפתיחה בשרת לכולם!')
+            .addStringOption(option => 
+                option.setName('סוג').setDescription('בחרו את סוג התיבה').setRequired(true)
+                    .addChoices(
+                        { name: '🟢 תיבה רגילה', value: 'regular' },
+                        { name: '📦 תיבת עץ', value: 'wood' },
+                        { name: '🟡 תיבת זהב', value: 'gold' }
+                    )
+            ),
+
+        // 3. פקודת הוסף-תיבה (הענקה אישית למשתמש!)
+        new SlashCommandBuilder()
+            .setName('הוסף-תיבה')
+            .setDescription('הענקת תיבת פנדורה אישית למלאי המאובטח של המשתמש!')
+            .addUserOption(option => 
+                option.setName('משתמש').setDescription('בחרו את המשתמש שיקבל את התיבה').setRequired(true)
+            )
+            .addStringOption(option => 
+                option.setName('סוג').setDescription('בחרו את סוג התיבה להענקה').setRequired(true)
+                    .addChoices(
+                        { name: '🟢 תיבה רגילה', value: 'regular' },
+                        { name: '📦 תיבת עץ', value: 'wood' },
+                        { name: '🟡 תיבת זהב', value: 'gold' }
+                    )
+            ),
+
+        // 4. פקודת איש תלוי
+        new SlashCommandBuilder()
+            .setName('איש-תלוי-הפעלות')
+            .setDescription('הפעלת משחק איש תלוי מעוצב בשרת')
+            .addStringOption(option => option.setName('נושא').setDescription('רשמו את נושא המשחק').setRequired(true))
+            .addStringOption(option => option.setName('מילה').setDescription('רשמו את המילה הסודית שצריך לנחש').setRequired(true))
+            .addAttachmentOption(option => option.setName('תמונה').setDescription('קובץ תמונה מהמחשב (אופציונלי)').setRequired(false))
+    ];
+
+    try {
+        const guilds = await client.guilds.fetch();
+        for (const [guildId] of guilds) {
+            // דוחף את כל 4 הפקודות ישר לשרת שלך!
+            await client.application.commands.set(commandsData, guildId);
+        }
+        console.log('כל 4 פקודות הסלאש עודכנו בשרת שלך בהצלחה!');
+    } catch (error) { console.error('שגיאה ברישום:', error); }
 });
 
-// הקשבה להודעות בצ'אט
+// הקשבה להודעות בצ'אט (בשביל !פתחתיבה ותגובות רגילות)
 client.on('messageCreate', async (message) => {
     try {
         if (message.author.bot) return;
         
         if (message.content === 'היי') return await message.reply('היי');
         if (message.content === 'מה נשמע טרופידון?') return await message.reply('בסדר... מה איתך?');
-
-        // פקודת !הוסף-תיבה חסינה בצ'אט
-        if (message.content.startsWith('!הוסף-תיבה')) {
-            // 🔒 אבטחה: הבוט בודק אם יש לך הרשאת מנהל מערכת (Administrator) בשרת
-            if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-                return await message.reply('❌ אין לך הרשאות להשתמש בפקודה ניהולית זו.');
-            }
-
-            const args = message.content.split(' ');
-            const targetUser = message.mentions.users.first();
-            
-            // מחפש את המילה האחרונה שכתבת בהודעה כסוג התיבה
-            let inputType = args[args.length - 1];
-            let boxType = '';
-
-            if (inputType === 'זהב' || inputType === 'gold') boxType = 'gold';
-            else if (inputType === 'עץ' || inputType === 'wood') boxType = 'wood';
-            else if (inputType === 'רגיל' || inputType === 'regular' || inputType === 'רגילה') boxType = 'regular';
-
-            if (!targetUser || !boxType) {
-                return await message.reply('⚠️ **איך מפעילים?** תכתוב בצורה הזו (חובה לתייג עם @):\n`!הוסף-תיבה [@משתמש] [רגיל / עץ / זהב]`\n\n*לדוגמה:* `!הוסף-תיבה @עידו זהב`');
-            }
-
-            // הוספה לבנק המאובטח
-            const currentBoxes = userInventory.get(targetUser.id) || [];
-            currentBoxes.push(boxType);
-            userInventory.set(targetUser.id, currentBoxes);
-
-            let boxName;
-            if (boxType === 'regular') boxName = 'תיבה רגילה ירוקה 🟢';
-            else if (boxType === 'wood') boxName = 'תיבת עץ 📦';
-            else if (boxType === 'gold') boxName = 'תיבת זהב 🟡';
-
-            const notifyEmbed = new EmbedBuilder()
-                .setColor('#3498db')
-                .setTitle('💰 המלאי האישי עודכן!')
-                .setDescription(`הוענקה **${boxName}** בהצלחה למלאי המאובטח של ${targetUser}!\n\n💬 המשתמש יכול כעת לרשום בצ'אט: \`!פתחתיבה\` כדי לפתוח אותה!`)
-                .setFooter({ text: `סה"כ תיבות במלאי שלו: ${currentBoxes.length}` });
-
-            return await message.reply({ embeds: [notifyEmbed] });
-        }
 
         // פקודת !פתחתיבה לפתיחת המלאי האישי
         if (message.content === '!פתחתיבה') {
@@ -154,7 +169,7 @@ client.on('messageCreate', async (message) => {
             let statusText = '';
             if (gameState.word.includes(guess)) {
                 const isWon = [...gameState.word].every(letter => gameState.guessedLetters.has(letter));
-                if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`המילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
+                if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`Mהמילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
                 statusText = `✅ האות **${guess}** נכונה!`;
             } else { statusText = `❌ האות **${guess}** אינה נכונה!`; }
 
@@ -164,12 +179,11 @@ client.on('messageCreate', async (message) => {
     } catch (error) { console.error(error); }
 });
 
-// הקשבה ללחיצות על כפתורים
+// הקשבה לפקודות סלאש ואינטראקציות
 client.on('interactionCreate', async (interaction) => {
     try {
-        if (!interaction.isButton()) return;
-
-        if (interaction.customId.startsWith('open_box_')) {
+        // לחיצה על כפתור פתיחת התיבה
+        if (interaction.isButton() && interaction.customId.startsWith('open_box_')) {
             const parts = interaction.customId.split('_');
             const boxType = parts[2];
             const allowedUserId = parts[3];
@@ -190,15 +204,3 @@ client.on('interactionCreate', async (interaction) => {
                 .setDescription(`👑 המפתח הסתובב... ונפתחה **${boxName}** על ידי המשתמש ${interaction.user}!\n\n✨ **והפרס שזכיתם בו הוא:** ✨\n> **${randomPrize}**`)
                 .setImage(openedImage);
 
-            return await interaction.update({ embeds: [finalEmbed], components: [] });
-        }
-    } catch (error) { console.error(error); }
-});
-
-function displayWordStatus(gameState) {
-    let display = '';
-    for (const letter of gameState.word) { display += gameState.guessedLetters.has(letter) ? ` ${letter} ` : ' ＿ '; }
-    return '`' + display.trim() + '`';
-}
-
-client.login(process.env.DISCORD_TOKEN);
