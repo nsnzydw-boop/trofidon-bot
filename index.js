@@ -4,7 +4,8 @@ const {
     EmbedBuilder, 
     ActionRowBuilder, 
     ButtonBuilder, 
-    ButtonStyle
+    ButtonStyle,
+    PermissionsBitField
 } = require('discord.js');
 const http = require('http');
 
@@ -21,11 +22,6 @@ const activeGames = new Map();
 
 // בנק התיבות המאובטח של המשתמשים
 const userInventory = new Map();
-
-// =======================================================
-// 👑 נעילת הבוט: ה-ID הרשמי של עידו המנהל הראשי! 👑
-// =======================================================
-const OWNER_ID = '1552206115738222602';
 
 // הגנה מוחלטת מפני קריסות
 process.on('unhandledRejection', (reason) => { console.error('שגיאה:', reason); });
@@ -74,8 +70,8 @@ client.on('messageCreate', async (message) => {
 
         // פקודת !הוסף-תיבה חסינה בצ'אט
         if (message.content.startsWith('!הוסף-תיבה')) {
-            // 🔒 אבטחה: בודק אם זה באמת ה-ID שלך מפעיל את הפקודה
-            if (message.author.id !== OWNER_ID) {
+            // 🔒 אבטחה: הבוט בודק אם יש לך הרשאת מנהל מערכת (Administrator) בשרת
+            if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
                 return await message.reply('❌ אין לך הרשאות להשתמש בפקודה ניהולית זו.');
             }
 
@@ -175,8 +171,8 @@ client.on('interactionCreate', async (interaction) => {
 
         if (interaction.customId.startsWith('open_box_')) {
             const parts = interaction.customId.split('_');
-            const boxType = parts;
-            const allowedUserId = parts;
+            const boxType = parts[2];
+            const allowedUserId = parts[3];
 
             if (allowedUserId && interaction.user.id !== allowedUserId) {
                 return await interaction.reply({ content: '❌ התיבה הזו שייכת למשתמש אחר בלבד!', ephemeral: true });
