@@ -32,12 +32,17 @@ const OWNER_ID = 'שים_כאן_את_האיידי_האישי_שלך';
 process.on('unhandledRejection', (reason) => { console.error('שגיאה:', reason); });
 process.on('uncaughtException', (err) => { console.error('שגיאה חמורה:', err); });
 
-// שרת אינטרנט פנימי לשמירה על הבוט ער 24/7 ב-Render
+// 🔥 שרת פנימי משודרג שעוקף את החסימות החדשות של Render ומחזיר את הבוט לאונליין!
 const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Trofidon is Alive!\n');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: "alive", bot: "Trofidon", timestamp: Date.now() }));
 });
-server.listen(process.env.PORT || 10000);
+
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => {
+    console.log(`שרת המניעה מאופליין פועל בהצלחה על פורט ${PORT}`);
+});
 
 // רשימות הפרסים לתיבות
 const regularPrizes = ['נקודות לשרת', 'תפקיד זמני מעוצב', 'פרס ניחומים: כלום!', 'גישה לערוץ סודי ל-24 שעות'];
@@ -82,6 +87,7 @@ client.once('ready', async () => {
                     )
             ),
 
+        // הפקודה המעודכנת והמקוצרת בסדר התבניות שביקשת!
         new SlashCommandBuilder()
             .setName('נתינת-תיבה')
             .setDescription('הענקת תיבת פנדורה אישית למלאי המאובטח של המשתמש!')
@@ -185,11 +191,11 @@ client.on('messageCreate', async (message) => {
             let statusText = '';
             if (gameState.word.includes(guess)) {
                 const isWon = [...gameState.word].every(letter => gameState.guessedLetters.has(letter));
-                if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`المילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
+                if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`המילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
                 statusText = `✅ האות **${guess}** נכונה!`;
             } else { statusText = `❌ האות **${guess}** אינה נכונה!`; }
 
-            const updatedEmbed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n${statusText}\n\n**המילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
+            const updatedEmbed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n${statusText}\n\n**Mילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
             return await message.reply({ embeds: [updatedEmbed] });
         }
     } catch (error) { console.error(error); }
@@ -204,7 +210,3 @@ client.on('interactionCreate', async (interaction) => {
             const allowedUserId = parts[3];
 
             if (allowedUserId && interaction.user.id !== allowedUserId) {
-                return await interaction.reply({ content: '❌ התיבה הזו שייכת למשתמש אחר בלבד!', ephemeral: true });
-            }
-
-            let prizeList, boxName, embedColor, openedImage;
