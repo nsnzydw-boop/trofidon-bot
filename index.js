@@ -23,9 +23,9 @@ const activeGames = new Map();
 const userInventory = new Map();
 
 // =======================================================
-// 👑 נעילת הבוט: שים כאן את ה-ID האישי שלך מדיסקורד! 👑
+// 👑 נעילת הבוט: ה-ID הרשמי של עידו המנהל הראשי! 👑
 // =======================================================
-const OWNER_ID = 'שים_כאן_את_האיידי_האישי_שלך';
+const OWNER_ID = '1552206115738222602';
 
 // הגנה מוחלטת מפני קריסות
 process.on('unhandledRejection', (reason) => { console.error('שגיאה:', reason); });
@@ -64,7 +64,7 @@ client.once('ready', () => {
     console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
 });
 
-// הקשבה להודעות בצ'אט (תגובות רגילות, ניחושי איש תלוי, ופקודות טקסט חסינות)
+// הקשבה להודעות בצ'אט
 client.on('messageCreate', async (message) => {
     try {
         if (message.author.bot) return;
@@ -72,25 +72,26 @@ client.on('messageCreate', async (message) => {
         if (message.content === 'היי') return await message.reply('היי');
         if (message.content === 'מה נשמע טרופידון?') return await message.reply('בסדר... מה איתך?');
 
-        // 🔥 פקודת !הוסף-תיבה החדשה והחסינה בצ'אט!
-        // דוגמה להפעלה: !הוסף-תיבה @Ido gold
+        // פקודת !הוסף-תיבה חסינה בצ'אט
         if (message.content.startsWith('!הוסף-תיבה')) {
-            // 🔒 אבטחה: רק בעל הבוט יכול לתת תיבות בצ'אט
+            // 🔒 אבטחה: בודק אם זה באמת ה-ID שלך מפעיל את הפקודה
             if (message.author.id !== OWNER_ID) {
                 return await message.reply('❌ אין לך הרשאות להשתמש בפקודה ניהולית זו.');
             }
 
             const args = message.content.split(' ');
             const targetUser = message.mentions.users.first();
-            let boxType = args[2] ? args[2].toLowerCase() : '';
+            
+            // מחפש את המילה האחרונה שכתבת בהודעה כסוג התיבה
+            let inputType = args[args.length - 1];
+            let boxType = '';
 
-            // תרגום מילים בעברית לסוג התיבה בקוד
-            if (boxType === 'זהב' || boxType === 'gold') boxType = 'gold';
-            else if (boxType === 'עץ' || boxType === 'wood') boxType = 'wood';
-            else if (boxType === 'רגיל' || boxType === 'regular') boxType = 'regular';
+            if (inputType === 'זהב' || inputType === 'gold') boxType = 'gold';
+            else if (inputType === 'עץ' || inputType === 'wood') boxType = 'wood';
+            else if (inputType === 'רגיל' || inputType === 'regular' || inputType === 'רגילה') boxType = 'regular';
 
-            if (!targetUser || !['regular', 'wood', 'gold'].includes(boxType)) {
-                return await message.reply('⚠️ **איך מפעילים?** תכתוב בצורה הזו:\n`!הוסף-תיבה [@משתמש] [רגיל / עץ / זהב]`\n\n*לדוגמה:* `!הוסף-תיבה @Ido זהב`');
+            if (!targetUser || !boxType) {
+                return await message.reply('⚠️ **איך מפעילים?** תכתוב בצורה הזו (חובה לתייג עם @):\n`!הוסף-תיבה [@משתמש] [רגיל / עץ / זהב]`\n\n*לדוגמה:* `!הוסף-תיבה @עידו זהב`');
             }
 
             // הוספה לבנק המאובטח
@@ -112,7 +113,7 @@ client.on('messageCreate', async (message) => {
             return await message.reply({ embeds: [notifyEmbed] });
         }
 
-        // 🔥 פקודת !פתחתיבה לפתיחת המלאי האישי
+        // פקודת !פתחתיבה לפתיחת המלאי האישי
         if (message.content === '!פתחתיבה') {
             const userId = message.author.id;
             const userBoxes = userInventory.get(userId) || [];
@@ -157,11 +158,11 @@ client.on('messageCreate', async (message) => {
             let statusText = '';
             if (gameState.word.includes(guess)) {
                 const isWon = [...gameState.word].every(letter => gameState.guessedLetters.has(letter));
-                if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`Mהמילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
+                if (isWon) { activeGames.delete(message.channel.id); const winEmbed = new EmbedBuilder().setColor('#1f8b4c').setTitle('🎉 ניצחון!').setDescription(`המילה הייתה: **${gameState.word}**`).setImage(gameState.image); return await message.reply({ embeds: [winEmbed] }); }
                 statusText = `✅ האות **${guess}** נכונה!`;
             } else { statusText = `❌ האות **${guess}** אינה נכונה!`; }
 
-            const updatedEmbed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n${statusText}\n\n**Mילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
+            const updatedEmbed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n${statusText}\n\n**המילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
             return await message.reply({ embeds: [updatedEmbed] });
         }
     } catch (error) { console.error(error); }
@@ -174,8 +175,8 @@ client.on('interactionCreate', async (interaction) => {
 
         if (interaction.customId.startsWith('open_box_')) {
             const parts = interaction.customId.split('_');
-            const boxType = parts[2];
-            const allowedUserId = parts[3];
+            const boxType = parts;
+            const allowedUserId = parts;
 
             if (allowedUserId && interaction.user.id !== allowedUserId) {
                 return await interaction.reply({ content: '❌ התיבה הזו שייכת למשתמש אחר בלבד!', ephemeral: true });
