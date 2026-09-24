@@ -32,7 +32,7 @@ const OWNER_ID = 'שים_כאן_את_האיידי_האישי_שלך';
 process.on('unhandledRejection', (reason) => { console.error('שגיאה:', reason); });
 process.on('uncaughtException', (err) => { console.error('שגיאה חמורה:', err); });
 
-// 🔥 שרת פנימי משודרג שעוקף את החסימות החדשות של Render ומחזיר את הבוט לאונליין!
+// שרת אינטרנט פנימי לשמירה על הבוט ער 24/7 ב-Render
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -87,7 +87,6 @@ client.once('ready', async () => {
                     )
             ),
 
-        // הפקודה המעודכנת והמקוצרת בסדר התבניות שביקשת!
         new SlashCommandBuilder()
             .setName('נתינת-תיבה')
             .setDescription('הענקת תיבת פנדורה אישית למלאי המאובטח של המשתמש!')
@@ -195,7 +194,7 @@ client.on('messageCreate', async (message) => {
                 statusText = `✅ האות **${guess}** נכונה!`;
             } else { statusText = `❌ האות **${guess}** אינה נכונה!`; }
 
-            const updatedEmbed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n${statusText}\n\n**Mילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
+            const updatedEmbed = new EmbedBuilder().setColor('#0099ff').setTitle('🎯 איש תלוי').setDescription(`• **הנושא:** ${gameState.subject}\n\n${statusText}\n\n**המילה:**\n${displayWordStatus(gameState)}`).setImage(gameState.image);
             return await message.reply({ embeds: [updatedEmbed] });
         }
     } catch (error) { console.error(error); }
