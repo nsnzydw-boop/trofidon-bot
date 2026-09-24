@@ -37,9 +37,11 @@ function saveInventory(inventory) {
     catch (error) { console.error('שגיאה בשמירת המלאי:', error); }
 }
 
+// הגנה מוחלטת מפני קריסות שרת
 process.on('unhandledRejection', (reason) => { console.error('נלכדה שגיאה (Rejection):', reason); });
 process.on('uncaughtException', (err) => { console.error('נלכדה שגיאה חמורה (Exception):', err); });
 
+// שרת אינטרנט פנימי חובה עבור Render
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -57,7 +59,7 @@ const images = {
     gold: { closed: 'https://discordapp.com', opened: 'https://discordapp.com' }
 };
 
-// רישום פקודות סלאש (כולל פקודת המדריך החדשה)
+// רישום פקודות סלאש בצורה גלובלית ויציבה
 client.once('ready', async () => {
     console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
     
@@ -105,15 +107,13 @@ client.once('ready', async () => {
     ];
 
     try {
-        const guilds = await client.guilds.fetch();
-        for (const [guildId] of guilds) {
-            await client.application.commands.set(commandsData, guildId).catch(() => null);
-        }
-        console.log('כל פקודות הסלאש עודכנו בהצלחה!');
+        // רישום פקודות בצורה גלובלית ישירות לאפליקציה (הכי בטוח ללא קריסות)
+        await client.application.commands.set(commandsData);
+        console.log('כל פקודות הסלאש עודכנו בצורה גלובלית בהצלחה!');
     } catch (error) { console.error('שגיאה ברישום פקודות:', error); }
 });
 
-// פונקציה לייצור תפריט הבחירה של המשחקים כדי לא לשכפל קוד
+// פונקציה לייקור תפריט הבחירה
 function createGamesSelectMenu() {
     const select = new StringSelectMenuBuilder()
         .setCustomId('game_guide_select')
@@ -128,10 +128,10 @@ function createGamesSelectMenu() {
     return new ActionRowBuilder().addComponents(select);
 }
 
-// קולט פקודות סלאש ואינטראקציות (כפתורים ותפריטים)
+// קולט אינטראקציות (פקודות סלאש, תפריטים וכפתורים)
 client.on('interactionCreate', async (interaction) => {
     try {
-        // --- 1. טיפול בפקודות סלאש ---
+        // --- 1. פקודות סלאש ---
         if (interaction.isChatInputCommand()) {
             if (interaction.commandName === 'מדריך') {
                 const mainEmbed = new EmbedBuilder()
@@ -158,19 +158,15 @@ client.on('interactionCreate', async (interaction) => {
                 const row = createGamesSelectMenu();
                 return await interaction.reply({ embeds: [mainEmbed], components: [row] });
             }
-            
-            // כאן אפשר להוסיף את שאר לוגיקת פקודות הסלאש (say, פתח-תיבה וכו') במידת הצורך
         }
 
-        // --- 2. טיפול בתפריטי בחירה (Select Menus) ---
+        // --- 2. תפריטי בחירה ---
         if (interaction.isStringSelectMenu()) {
             if (interaction.customId === 'game_guide_select') {
-                const selectedGame = interaction.values[0];
+                const selectedGame = interaction.values[0]; // תיקון אינדקס בחירה
                 let gameTitle = '';
                 let gameDescription = '';
-                let embedColor = '#3498db';
 
-                // כאן אתה יכול לערוך ולכתוב את ההסברים האמיתיים לכל משחק!
                 if (selectedGame === 'game_country_city') {
                     gameTitle = '🌍 משחק: ארץ עיר';
                     gameDescription = 'הסבר על משחק ארץ עיר:\nהבוט יבחר אות אקראית, והראשון שיכתוב ארץ, עיר, חי, צומח או דומם באות הזו יזכה באסימונים!';
@@ -189,11 +185,16 @@ client.on('interactionCreate', async (interaction) => {
                 }
 
                 const gameEmbed = new EmbedBuilder()
-                    .setColor(embedColor)
+                    .setColor('#3498db')
                     .setTitle(gameTitle)
                     .setDescription(gameDescription)
                     .setFooter({ text: 'תוכלו לבחור משחק אחר בתפריט בכל עת כדי לקרוא עליו.' });
 
-                // כפתור חזרה למדריך הראשי
                 const backRow = createGamesSelectMenu();
-                
+                return await interaction.update({ embeds: [gameEmbed], components: [backRow] });
+            }
+        }
+
+        // --- 3. כפתורים ---
+        if (interaction.isButton()) {
+            if (interaction.customId.startsWith('open_box_global_')) {
