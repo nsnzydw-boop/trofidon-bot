@@ -32,7 +32,7 @@ process.on('uncaughtException', (err) => { console.error('נלכדה שגיאה 
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: "alive", bot: "Trofidon" }));
+    res.end(JSON.stringify({ status: "alive", bot: "BUGO" }));
 });
 server.listen(process.env.PORT || 10000);
 
@@ -59,12 +59,12 @@ const images = {
 
 // רישום פקודות סלאש אוטומטית בדיסקורד
 client.once('ready', async () => {
-    console.log(`טרופידון מחובר בהצלחה בתור ${client.user.tag}!`);
+    console.log(`BUGO מחובר בהצלחה בתור \${client.user.tag}!`);
     
     const commandsData = [
         new SlashCommandBuilder()
             .setName('say')
-            .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט')
+            .setDescription('גורם לבוט לשלוח הודעה מותאמת אישית שלכם בצ׳אט בכתום')
             .addStringOption(option => option.setName('תוכן').setDescription('רשמו את מה שאתם רוצים שהבוט יגיד').setRequired(true)),
             
         new SlashCommandBuilder()
@@ -109,21 +109,35 @@ client.once('ready', async () => {
     } catch (error) { console.error('שגיאה ברישום פקודות:', error); }
 });
 
+// טיפול בפקודות סלאש (Interaction Create) כולל פקודת say כתומה!
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const { commandName } = interaction;
+
+    if (commandName === 'say') {
+        const content = interaction.options.getString('תוכן');
+        // עיטוף הטקסט בבלוק קוד מסוג arm שיוצר צבע כתום בדיסקורד
+        const orangeMessage = `\`\`\`arm\n${content}\n\`\`\``;
+        await interaction.reply({ content: orangeMessage });
+    }
+});
+
 // הקשבה להודעות בצ'אט (מערכת פקודות צ'אט חסינה ומובנית לגיבוי מלא)
 client.on('messageCreate', async (message) => {
     try {
         if (message.author.bot) return;
         
         if (message.content === 'היי') return await message.reply('היי');
-        if (message.content === 'מה נשמע טרופידון?') return await message.reply('בסדר... מה איתך?');
+        if (message.content === 'מה נשמע?') return await message.reply('בסדר... מה איתך?');
 
-        // 1. גיבוי לצ'אט לפקודת !say
+        // 1. גיבוי לצ'אט לפקודת !say (צבע כתום גם בצ'אט הרגיל!)
         if (message.content.startsWith('!say')) {
             if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
             const text = message.content.replace('!say', '').trim();
             if (!text) return await message.reply('❌ נא לרשום טקסט אחרי הפקודה.');
             await message.delete();
-            return await message.channel.send({ content: text });
+            return await message.channel.send({ content: `\`\`\`arm\n${text}\n\`\`\`` });
         }
 
         // 2. גיבוי לצ'אט לפקודת !פתח-תיבה (כללית לכולם)
@@ -166,22 +180,22 @@ client.on('messageCreate', async (message) => {
             return await message.reply({ embeds: [notifyEmbed] });
         }
 
-        // פקודת !פתחתיבה לפתיחת המלאי האישי (תמיד עובדת בצ'אט!)
+        // פקודת !פתחתיבה לפתיחת המלאי האישי
         if (message.content === '!פתחתיבה') {
-            const userId = message.author.id;
-            const userBoxes = userInventory.get(userId) || [];
+            const currentBoxes = userInventory.get(message.author.id) || [];
+            if (currentBoxes.length === 0) return await message.reply('❌ אין לך תיבות במלאי האישי כרגע.');
+            
+            const boxType = currentBoxes.shift(); // לוקח את התיבה הראשונה
+            userInventory.set(message.author.id, currentBoxes);
+            
+            let prizes = boxType === 'gold' ? goldPrizes : boxType === 'wood' ? woodPrizes : regularPrizes;
+            const randomPrize = prizes[Math.floor(Math.random() * prizes.length)];
+            
+            return await message.reply(`🔓 פתחת תיבה מהמלאי האישי שלך וזכית ב: **${randomPrize}**!`);
+        }
 
-            if (userBoxes.length === 0) {
-                return await message.reply('אין לך תיבות לפתוח');
-            }
+    } catch (error) { console.error('שגיאה בטיפול בהודעה:', error); }
+});
 
-            const boxType = userBoxes.shift();
-            userInventory.set(userId, userBoxes);
-
-            let boxName, embedColor, closedImage;
-            if (boxType === 'regular') { boxName = 'תיבה רגילה ירוקה 🟢'; embedColor = '#2ecc71'; closedImage = images.regular.closed; }
-            else if (boxType === 'wood') { boxName = 'תיבת עץ 📦'; embedColor = '#e67e22'; closedImage = images.wood.closed; }
-            else if (boxType === 'gold') { boxName = 'תיבת זהב 🟡'; embedColor = '#f1c40f'; closedImage = images.gold.closed; }
-
-            const openEmbed = new EmbedBuilder().setColor(embedColor).setTitle('🎁 פתיחת תיבת פנדורה מהמלאי האישי!').setDescription(`היי ${message.author},\nשלפת מהבנק האישי שלך **${boxName}** מוזהבת ונעולה!\n\n🔒 **רק אתה** יכול ללחוץ על הכפתור למטה כדי לפתוח אותה ולגלות את הפרס!`).setImage(closedImage).setFooter({ text: `תיבות שנותרו לך במלאי: ${userBoxes.length}` });
-            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`open_box_${boxType}_${userId}`).setLabel(`פתח את התיבה שלי! 🔓`).setStyle(ButtonStyle.Primary));
+// התחברות לדיסקורד באמצעות הטוקן המאובטח מרנדר
+client.login(process.env.DISCORD_TOKEN);
