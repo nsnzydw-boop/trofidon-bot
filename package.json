@@ -1,11 +1,16 @@
 {
-  "name": "trofidon-bot",
+  "name": "bugo-bot",
   "version": "1.0.0",
+  "description": "Discord Bot for Tropy",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.14.1"
+    "discord.js": "^14.14.1",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=16.9.0"
   }
 }
